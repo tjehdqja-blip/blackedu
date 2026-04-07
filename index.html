@@ -431,6 +431,7 @@ textarea{resize:vertical;min-height:70px;}
   <div class="nav-right">
     <span class="role-badge" id="role-badge"></span>
     <!-- 관리자 전용 버튼 -->
+    <button class="btn btn-ghost admin-only" id="config-btn" onclick="openSharedConfig()" style="border-color:#5DCAA5;color:#5DCAA5;">⚙ 공유 설정</button>
     <button class="btn btn-ghost admin-only" id="export-btn" onclick="exportAll()">내보내기</button>
     <button class="btn btn-pdf" onclick="printFiltered()">🖨 목록 출력</button>
     <button class="btn btn-accent" id="add-btn" onclick="openAdd()">+ 문제 추가</button>
@@ -730,11 +731,81 @@ textarea{resize:vertical;min-height:70px;}
   </div>
 </div>
 
+<!-- 공유 설정 오버레이 (관리자 전용) -->
+<div class="overlay" id="shared-config-overlay" onclick="closeSharedConfig(event)" style="display:none;">
+  <div style="background:var(--surface);border-radius:var(--rl);width:100%;max-width:560px;border:1px solid var(--border);overflow:hidden;margin-top:40px;">
+    <div style="background:var(--text);padding:14px 22px;display:flex;align-items:center;justify-content:space-between;">
+      <div>
+        <div style="font-family:var(--mono);font-size:13px;letter-spacing:2px;color:var(--accent);">공유 설정 관리</div>
+        <div style="font-size:11px;color:#9A978F;margin-top:2px;">설정 저장 후 HTML 파일을 GitHub에 다시 업로드하세요</div>
+      </div>
+      <button class="modal-close" onclick="document.getElementById('shared-config-overlay').style.display='none'">✕</button>
+    </div>
+    <div style="padding:22px;">
+
+      <!-- 현재 설정 상태 -->
+      <div style="background:var(--bg);border:1px solid var(--border);border-radius:var(--r);padding:12px 16px;margin-bottom:18px;">
+        <div style="font-size:10px;font-weight:600;letter-spacing:1px;color:var(--text-3);text-transform:uppercase;margin-bottom:8px;">현재 HTML 내장 설정 상태</div>
+        <div id="config-status-rows"></div>
+      </div>
+
+      <!-- 입력 폼 -->
+      <div style="margin-bottom:12px;">
+        <label style="font-size:11px;font-weight:600;color:var(--text-2);">Anthropic API 키</label>
+        <input type="password" id="sc-api-key" placeholder="sk-ant-api03-..."
+          style="width:100%;margin-top:4px;padding:8px 10px;border:1px solid var(--border);border-radius:var(--r);font-family:var(--mono);font-size:12px;background:var(--bg);color:var(--text);outline:none;">
+        <div style="font-size:10px;color:var(--text-3);margin-top:3px;">선생님들이 AI 기능을 쓸 때 자동으로 사용됩니다</div>
+      </div>
+
+      <div style="margin-bottom:12px;">
+        <label style="font-size:11px;font-weight:600;color:var(--text-2);">Google OAuth 클라이언트 ID</label>
+        <input type="text" id="sc-client-id" placeholder="123456789-abc.apps.googleusercontent.com"
+          style="width:100%;margin-top:4px;padding:8px 10px;border:1px solid var(--border);border-radius:var(--r);font-family:var(--mono);font-size:11px;background:var(--bg);color:var(--text);outline:none;">
+      </div>
+
+      <div style="margin-bottom:18px;">
+        <label style="font-size:11px;font-weight:600;color:var(--text-2);">Drive 공유 파일 ID</label>
+        <input type="text" id="sc-file-id" placeholder="1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms"
+          style="width:100%;margin-top:4px;padding:8px 10px;border:1px solid var(--border);border-radius:var(--r);font-family:var(--mono);font-size:11px;background:var(--bg);color:var(--text);outline:none;">
+        <div style="font-size:10px;color:var(--text-3);margin-top:3px;">현재 Drive 파일 ID: <span id="sc-current-fileid" style="color:var(--blue);">—</span></div>
+      </div>
+
+      <!-- 안내 박스 -->
+      <div style="background:#0D3B26;border:1px solid #1A5C3A;border-radius:var(--r);padding:12px 14px;margin-bottom:16px;">
+        <div style="font-size:12px;font-weight:600;color:#5DCAA5;margin-bottom:6px;">적용 방법</div>
+        <div style="font-size:11px;color:#3A7A5A;line-height:1.7;">
+          1. 아래 <strong style="color:#5DCAA5;">"설정 적용 HTML 다운로드"</strong> 버튼 클릭<br>
+          2. 다운로드된 <code style="background:rgba(93,202,165,0.1);padding:1px 5px;border-radius:3px;">tomahawk_configured.html</code> 파일을<br>
+          &nbsp;&nbsp;&nbsp;<strong style="color:#5DCAA5;">index.html</strong> 로 이름 바꾸기<br>
+          3. GitHub 저장소에 <strong style="color:#5DCAA5;">기존 파일 대체 업로드</strong><br>
+          4. 이후 접속하는 선생님들은 로그인만 하면 자동 연결
+        </div>
+      </div>
+
+      <div style="display:flex;gap:8px;justify-content:flex-end;">
+        <button class="btn btn-ghost" style="color:var(--text-2);border-color:var(--border);"
+          onclick="document.getElementById('shared-config-overlay').style.display='none'">닫기</button>
+        <button class="btn btn-accent" onclick="downloadConfiguredHtml()">⬇ 설정 적용 HTML 다운로드</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
 // ── CONSTANTS ──
 const ADMIN_PW = 'theblack2024';
+
+// ══════════════════════════════════════════════════════
+// ── 관리자 공유 설정 (GitHub 업로드 전 관리자가 1회 입력) ──
+// ══════════════════════════════════════════════════════
+const SHARED_CONFIG = {
+  ANTHROPIC_API_KEY: '',   // Anthropic API 키 (sk-ant-...)
+  GOOGLE_CLIENT_ID:  '',   // Google OAuth 클라이언트 ID
+  DRIVE_FILE_ID:     '',   // 공유 Drive 파일 ID (선생님들이 공유할 파일)
+};
+// ══════════════════════════════════════════════════════
 
 // ── API KEY 관리 ──
 // 메모리 변수 (가장 신뢰할 수 있는 저장소 — iframe 샌드박스 환경에서 localStorage/sessionStorage 차단됨)
@@ -835,11 +906,18 @@ async function testApiKey(){
 }
 
 function loadApiKeyFromStorage(){
-  // 실제 키 복원 시도
+  // ① SHARED_CONFIG 우선 (관리자가 HTML에 내장한 경우)
+  if(SHARED_CONFIG.ANTHROPIC_API_KEY && SHARED_CONFIG.ANTHROPIC_API_KEY.startsWith('sk-')){
+    _apiKey = SHARED_CONFIG.ANTHROPIC_API_KEY;
+    updateApiKeyStatus('ok','● 공유 설정으로 연결됨');
+    const banner = document.getElementById('apikey-banner');
+    if(banner) banner.style.display = 'none'; // 선생님에게 배너 숨김
+    return;
+  }
+  // ② localStorage/sessionStorage 복원 시도
   let saved = '';
   try{ saved = sessionStorage.getItem('tmhk_key') || ''; }catch(e){}
   if(!saved){ try{ saved = localStorage.getItem('tomahawk_apikey') || ''; }catch(e){} }
-
   if(saved && saved.startsWith('sk-') && saved.length > 20){
     _apiKey = saved;
     const masked = saved.slice(0,10) + '••••••••••••••••' + saved.slice(-4);
@@ -935,6 +1013,24 @@ function applyRole() {
   document.querySelectorAll('.admin-only').forEach(el => {
     el.style.display = isAdmin ? '' : 'none';
   });
+
+  // 선생님 역할 — SHARED_CONFIG가 설정돼 있으면 배너 숨김
+  const sharedConfigured = SHARED_CONFIG.ANTHROPIC_API_KEY && SHARED_CONFIG.GOOGLE_CLIENT_ID;
+  if(!isAdmin && sharedConfigured){
+    const apiBanner   = document.getElementById('apikey-banner');
+    const driveBanner = document.getElementById('drive-banner');
+    if(apiBanner)   apiBanner.style.display   = 'none';
+    if(driveBanner) driveBanner.style.display  = 'none';
+  }
+
+  // 관리자 역할 — 항상 배너 표시
+  if(isAdmin){
+    const apiBanner   = document.getElementById('apikey-banner');
+    const driveBanner = document.getElementById('drive-banner');
+    if(apiBanner)   apiBanner.style.display   = '';
+    if(driveBanner) driveBanner.style.display  = '';
+  }
+
   loadApiKeyFromStorage();
   initStorageOnLoad();
   load();
@@ -960,17 +1056,37 @@ const DRIVE_SCOPE   = 'https://www.googleapis.com/auth/drive.file';
 
 // ---------- 초기화 ----------
 function initStorageOnLoad(){
-  // 저장된 설정 복원
+  // ① SHARED_CONFIG 우선 적용
+  if(SHARED_CONFIG.GOOGLE_CLIENT_ID){
+    driveClientId = SHARED_CONFIG.GOOGLE_CLIENT_ID;
+  }
+  if(SHARED_CONFIG.DRIVE_FILE_ID){
+    driveFileId = SHARED_CONFIG.DRIVE_FILE_ID;
+  }
+
+  // ② localStorage 복원 (SHARED_CONFIG 없을 때만)
+  if(!driveClientId){
+    try{ driveClientId = localStorage.getItem(LS_CLIENTID)||''; }catch(e){}
+  }
+  if(!driveFileId){
+    try{ driveFileId = localStorage.getItem(LS_FILEID)||''; }catch(e){}
+  }
+
+  // UI 입력창 동기화
   try{
-    driveClientId = localStorage.getItem(LS_CLIENTID)||'';
-    driveFileId   = localStorage.getItem(LS_FILEID)||'';
     const inp = document.getElementById('drive-client-id-input');
     if(inp && driveClientId) inp.value = driveClientId;
     const finp = document.getElementById('drive-file-id-input');
     if(finp && driveFileId) finp.value = driveFileId;
   }catch(e){}
 
-  // GAPI 라이브러리 로드 대기 후 초기화
+  // SHARED_CONFIG가 완전히 설정된 경우 Drive 배너 모드 변경
+  const sharedFull = SHARED_CONFIG.GOOGLE_CLIENT_ID && SHARED_CONFIG.DRIVE_FILE_ID;
+  if(sharedFull){
+    setDriveStatus('connecting','Google 계정으로 자동 연결 중...');
+  }
+
+  // GAPI 라이브러리 로드 후 Drive 초기화
   if(driveClientId){ waitForGapi(); }
 }
 
@@ -1847,6 +1963,98 @@ body{font-family:'IBM Plex Sans KR',sans-serif;background:#fff;color:#1A1814;fon
 
 function printProblem(id){ const p=problems.find(x=>x.id===id); if(!p) return; const w=window.open('','_blank','width=900,height=1000'); w.document.write(buildPrintHTML([p])); w.document.close(); }
 function printFiltered(){ const list=getFiltered(); if(!list.length){ showToast('출력할 문제가 없습니다'); return; } if(list.length>20&&!confirm(`현재 ${list.length}개 문제를 모두 출력할까요?`)) return; const w=window.open('','_blank','width=900,height=1000'); w.document.write(buildPrintHTML(list)); w.document.close(); }
+
+// ── 공유 설정 관리 (관리자) ──
+function openSharedConfig(){
+  // 현재 설정 상태 표시
+  const rows = [
+    { label: 'Anthropic API 키', val: SHARED_CONFIG.ANTHROPIC_API_KEY, type: 'key' },
+    { label: 'Google 클라이언트 ID', val: SHARED_CONFIG.GOOGLE_CLIENT_ID, type: 'id' },
+    { label: 'Drive 파일 ID', val: SHARED_CONFIG.DRIVE_FILE_ID, type: 'id' },
+  ];
+  const container = document.getElementById('config-status-rows');
+  if(container){
+    container.innerHTML = rows.map(r => {
+      const isSet = r.val && r.val.length > 5;
+      const display = isSet
+        ? (r.type==='key'
+            ? r.val.slice(0,12)+'••••'+r.val.slice(-4)
+            : r.val.slice(0,16)+'...')
+        : '미설정';
+      return `<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:0.5px solid var(--border-light);">
+        <span style="font-size:10px;color:var(--text-3);min-width:130px;">${r.label}</span>
+        <span class="${isSet?'badge-teal':'badge-red'} tag" style="font-size:10px;padding:2px 8px;">${isSet?'✓ 설정됨':'✗ 미설정'}</span>
+        <span style="font-size:10px;font-family:var(--mono);color:var(--text-2);">${display}</span>
+      </div>`;
+    }).join('');
+  }
+
+  // 현재 Drive 파일 ID 표시
+  const fid = document.getElementById('sc-current-fileid');
+  if(fid) fid.textContent = driveFileId ? driveFileId.slice(0,20)+'...' : '연결 안 됨';
+
+  // 입력창에 현재 값 채우기
+  const apiInp = document.getElementById('sc-api-key');
+  const cidInp = document.getElementById('sc-client-id');
+  const fidInp = document.getElementById('sc-file-id');
+  if(apiInp) apiInp.value = SHARED_CONFIG.ANTHROPIC_API_KEY || '';
+  if(cidInp) cidInp.value = SHARED_CONFIG.GOOGLE_CLIENT_ID  || '';
+  if(fidInp) fidInp.value = SHARED_CONFIG.DRIVE_FILE_ID     || (driveFileId||'');
+
+  document.getElementById('shared-config-overlay').style.display = 'flex';
+}
+
+function closeSharedConfig(e){
+  if(e.target === document.getElementById('shared-config-overlay'))
+    document.getElementById('shared-config-overlay').style.display = 'none';
+}
+
+function downloadConfiguredHtml(){
+  const apiKey  = (document.getElementById('sc-api-key').value  || '').trim();
+  const clientId= (document.getElementById('sc-client-id').value|| '').trim();
+  const fileId  = (document.getElementById('sc-file-id').value  || driveFileId || '').trim();
+
+  if(!apiKey){ showToast('API 키를 입력해주세요'); return; }
+  if(!clientId){ showToast('Google 클라이언트 ID를 입력해주세요'); return; }
+
+  // 현재 HTML 소스를 읽어서 SHARED_CONFIG 값을 교체
+  fetch(location.href)
+    .then(r=>r.text())
+    .then(src=>{
+      // SHARED_CONFIG의 빈 값을 실제 값으로 교체
+      let updated = src;
+
+      // API 키 교체
+      updated = updated.replace(
+        /ANTHROPIC_API_KEY:\s*'[^']*'/,
+        `ANTHROPIC_API_KEY: '${apiKey}'`
+      );
+      // 클라이언트 ID 교체
+      updated = updated.replace(
+        /GOOGLE_CLIENT_ID:\s*'[^']*'/,
+        `GOOGLE_CLIENT_ID: '${clientId}'`
+      );
+      // Drive 파일 ID 교체
+      updated = updated.replace(
+        /DRIVE_FILE_ID:\s*'[^']*'/,
+        `DRIVE_FILE_ID: '${fileId}'`
+      );
+
+      const blob = new Blob([updated], {type:'text/html;charset=utf-8'});
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'tomahawk_configured.html';
+      a.click();
+      URL.revokeObjectURL(a.href);
+
+      showToast('✓ 설정이 적용된 HTML이 다운로드됩니다. index.html로 이름 바꿔 GitHub에 업로드하세요.');
+      document.getElementById('shared-config-overlay').style.display = 'none';
+    })
+    .catch(()=>{
+      // fetch 실패 시 (file:// 등) 안내
+      showToast('⚠ GitHub Pages 주소에서 실행 중일 때만 다운로드가 가능합니다.');
+    });
+}
 
 // ── TOAST ──
 function showToast(msg){ const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2400); }
