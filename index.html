@@ -950,6 +950,32 @@ function apiHeaders(){
   };
 }
 const ROMAN = ['I','II','III','IV','V','VI','VII','VIII','IX','X'];
+
+// ── JSON 안전 파싱 헬퍼 ──
+// AI 응답에서 실제 줄바꿈·탭 등 제어문자가 JSON 문자열 값 안에 들어오면 파싱 실패
+// → 문자열 값 내부의 제어문자를 이스케이프 처리 후 파싱
+function safeParseJson(raw) {
+  // 1) 코드블록 제거
+  let txt = raw.replace(/```json|```/g, '').trim();
+  // 2) JSON 블록 추출 ({ ... })
+  const m = txt.match(/\{[\s\S]*\}/);
+  if (!m) throw new Error('JSON 형식 응답을 찾을 수 없습니다');
+  txt = m[0];
+  // 3) 문자열 값 안의 raw 제어문자 이스케이프
+  //    JSON 문자열 리터럴(" ... ") 내부만 처리
+  txt = txt.replace(/"((?:[^"\\]|\\.)*)"/g, (match, inner) => {
+    const escaped = inner
+      .replace(/\n/g, '\\n')   // 이미 이스케이프된 건 건드리지 않음
+      .replace(/\r/g, '\\r')
+      .replace(/\t/g, '\\t')
+      .replace(/[\x00-\x1F\x7F]/g, c => {  // 실제 제어문자
+        const code = c.charCodeAt(0).toString(16).padStart(4,'0');
+        return '\\u' + code;
+      });
+    return '"' + escaped + '"';
+  });
+  return JSON.parse(txt);
+}
 const DIFF_LABEL = {5:'킬러',4:'준킬러',3:'고난도',2:'중급',1:'기본'};
 const DIFF_LABEL_P = {5:'★★★★★ 킬러',4:'★★★★☆ 준킬러',3:'★★★☆☆ 고난도',2:'★★☆☆☆ 중급',1:'★☆☆☆☆ 기본'};
 const DIFF_TAG = {5:'tag-red',4:'tag-amber',3:'tag-teal',2:'tag-blue',1:'tag-gray'};
@@ -1762,14 +1788,15 @@ async function ocrAndStructure(){
           role:'user',
           content:`다음 수학 문제를 분석해서 아래 JSON 형식으로만 응답하세요.
 코드블록(\`\`\`)이나 설명 없이 JSON만 출력하세요.
+JSON 문자열 값 안에는 반드시 \\n 이스케이프를 사용하고, 실제 줄바꿈 문자를 넣지 마세요.
 
 문제:
 ${problemText}
 
-출력 형식:
+출력 형식 (문자열 값에 실제 줄바꿈 금지):
 {
   "concept": "교과명 > 단원 > 핵심 개념",
-  "idea": "① 풀이 핵심 아이디어\n② 두번째 아이디어 (있을 경우)",
+  "idea": "① 풀이 핵심 아이디어 / ② 두번째 아이디어",
   "time": "목표 풀이 시간 (예: 7~9분)",
   "diff": 4,
   "steps": [
@@ -1796,9 +1823,7 @@ diff 기준: 1=기본, 2=중급, 3=고난도, 4=준킬러, 5=킬러`
 
     const rawTxt = d2.content.filter(c=>c.type==='text').map(c=>c.text).join('').trim();
     // JSON 추출 — 코드블록, 앞뒤 텍스트 제거
-    const jsonMatch = rawTxt.match(/\{[\s\S]*\}/);
-    if(!jsonMatch) throw new Error('JSON 형식 응답을 파싱할 수 없습니다');
-    const parsed = JSON.parse(jsonMatch[0]);
+    const parsed = safeParseJson(rawTxt);
 
     if(parsed.concept) document.getElementById('f-concept').value = parsed.concept;
     if(parsed.idea)    document.getElementById('f-idea').value    = parsed.idea;
@@ -1864,9 +1889,7 @@ ${problemText}
     const d=await r.json();
     if(d.error) throw new Error(d.error.message||'API 오류');
     const rawTxt=d.content.filter(c=>c.type==='text').map(c=>c.text).join('').trim();
-    const jsonMatch=rawTxt.match(/\{[\s\S]*\}/);
-    if(!jsonMatch) throw new Error('JSON 파싱 실패');
-    const parsed=JSON.parse(jsonMatch[0]);
+    const parsed=safeParseJson(rawTxt);
     if(parsed.concept) document.getElementById('f-concept').value=parsed.concept;
     if(parsed.idea)    document.getElementById('f-idea').value=parsed.idea;
     if(parsed.time)    document.getElementById('f-time').value=parsed.time;
@@ -1898,7 +1921,7 @@ async function aiStructure(){
     });
     const data=await resp.json();
     const text=data.content.map(c=>c.text||'').join('');
-    const parsed=JSON.parse(text.replace(/```json|```/g,'').trim());
+    const parsed=safeParseJson(text);
     document.getElementById('f-concept').value=parsed.concept||'';
     document.getElementById('f-idea').value=parsed.idea||'';
     document.getElementById('f-time').value=parsed.time||'';
