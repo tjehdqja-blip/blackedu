@@ -451,6 +451,7 @@ textarea{resize:vertical;min-height:70px;}
   </span>
   <span class="drive-info" id="drive-info">연결되지 않음 — 설정하면 모든 선생님이 실시간으로 문제를 공유합니다</span>
   <button class="drive-btn drive-btn-connect" id="drive-connect-btn" onclick="openDriveSetup()">연결 설정</button>
+  <button class="drive-btn drive-btn-sync" id="drive-create-btn" onclick="driveInitOrSync()" style="display:none;background:#0F6E56;border-color:#0F6E56;color:#fff;">+ 파일 생성</button>
   <button class="drive-btn drive-btn-sync" id="drive-sync-btn" onclick="driveSync()" style="display:none;">↻ 동기화</button>
   <button class="drive-btn drive-btn-disconnect" id="drive-disconnect-btn" onclick="driveDisconnect()" style="display:none;">연결 해제</button>
   <span class="drive-sync-info" id="drive-sync-time" style="display:none;"></span>
@@ -1118,7 +1119,7 @@ function gisLoaded(){
       if(resp.error){ setDriveStatus('error','인증 실패: '+resp.error); return; }
       _gisInited = true;
       maybeEnableDrive();
-      await driveSync();
+      await driveInitOrSync();   // 파일 없으면 생성, 있으면 동기화
     },
   });
   _gisInited = true;
@@ -1169,11 +1170,24 @@ async function save(){
 // ---------- Drive API 헬퍼 ----------
 async function driveReadFile(){
   if(!driveFileId) return null;
-  const r = await gapi.client.drive.files.get({
-    fileId: driveFileId, alt: 'media'
-  });
+  let r;
+  try{
+    r = await gapi.client.drive.files.get({
+      fileId: driveFileId, alt: 'media'
+    });
+  }catch(e){
+    // gapi는 HTTP 에러를 throw로 넘기기도 함
+    const status = e.status || (e.result && e.result.error && e.result.error.code);
+    if(status === 404) throw new Error('notFound: 파일이 Drive에 존재하지 않습니다');
+    throw new Error('Drive 읽기 오류: '+(e.message||JSON.stringify(e)));
+  }
+  if(r.status === 404) throw new Error('notFound: 파일이 Drive에 존재하지 않습니다');
   if(r.status !== 200) throw new Error('파일 읽기 실패: '+r.status);
-  return typeof r.result === 'string' ? JSON.parse(r.result) : r.result;
+  try{
+    return typeof r.result === 'string' ? JSON.parse(r.result) : r.result;
+  }catch(parseErr){
+    throw new Error('Drive 파일 파싱 실패: '+parseErr.message);
+  }
 }
 
 async function driveWriteFile(data){
@@ -1210,11 +1224,55 @@ async function driveWriteFile(data){
   }
 }
 
+// 최초 연결 시 파일 생성 또는 기존 파일 동기화
+async function driveInitOrSync(){
+  if(!driveReady){ return; }
+  setDriveStatus('connecting','Drive 초기화 중...');
+
+  // 1) fileId가 없으면 → 파일 먼저 생성
+  if(!driveFileId){
+    try{
+      setDriveStatus('connecting','Drive에 파일 생성 중...');
+      await driveWriteFile(problems);   // 이 안에서 driveFileId 세팅됨
+      setDriveStatus('on','Drive 파일 생성 완료 ✓ — ID: '+driveFileId.slice(0,14)+'...');
+      updateDriveSyncTime();
+      showToast('✓ Drive에 tomahawk_problems.json 파일이 생성되었습니다!\n공유 설정에서 파일 ID를 확인하세요.');
+      // sc-current-fileid 업데이트
+      const fidEl = document.getElementById('sc-current-fileid');
+      if(fidEl) fidEl.textContent = driveFileId.slice(0,20)+'...';
+    }catch(e){
+      setDriveStatus('error','파일 생성 실패: '+e.message);
+    }
+    return;
+  }
+
+  // 2) fileId가 있으면 → 동기화
+  await driveSync();
+}
+
 async function driveSync(){
   if(!driveReady){ showToast('먼저 구글 드라이브를 연결해주세요'); return; }
+
+  // fileId 없으면 생성으로 전환
+  if(!driveFileId){
+    await driveInitOrSync();
+    return;
+  }
+
   setDriveStatus('connecting','동기화 중...');
   try{
-    const data = await driveReadFile();
+    let data = null;
+    try{ data = await driveReadFile(); }
+    catch(readErr){
+      // 404 등 파일 없음 → 새로 생성
+      if(readErr.message && (readErr.message.includes('404') || readErr.message.includes('notFound'))){
+        driveFileId = '';
+        await driveInitOrSync();
+        return;
+      }
+      throw readErr;
+    }
+
     if(data && data.length){
       // 병합: 최신 ID 기준으로 합치기
       const map = new Map(problems.map(p=>[p.id, p]));
@@ -1223,11 +1281,12 @@ async function driveSync(){
       try{ localStorage.setItem(LS_KEY, JSON.stringify(problems)); }catch(e){}
       updateCounts(); renderList();
     }
-    setDriveStatus('on','동기화 완료');
+    setDriveStatus('on','동기화 완료 ✓');
     updateDriveSyncTime();
     showToast('✓ 동기화 완료 (총 '+problems.length+'문제)');
   }catch(e){
     setDriveStatus('error','동기화 실패: '+e.message);
+    console.error('[Drive] sync error:', e);
   }
 }
 
@@ -1249,13 +1308,21 @@ function setDriveStatus(state, msg){
   if(!dot||!info) return;
   dot.className='drive-status-dot '+state;
   info.textContent = msg||'';
-  const isOn = state==='on';
-  const cb = document.getElementById('drive-connect-btn');
-  const sb = document.getElementById('drive-sync-btn');
-  const db = document.getElementById('drive-disconnect-btn');
-  if(cb) cb.style.display = isOn ? 'none' : '';
-  if(sb) sb.style.display = isOn ? '' : 'none';
-  if(db) db.style.display = isOn ? '' : 'none';
+  const isOn         = state==='on';
+  const isConnecting = state==='connecting';
+  const cb  = document.getElementById('drive-connect-btn');    // 연결 설정
+  const crb = document.getElementById('drive-create-btn');     // 파일 생성
+  const sb  = document.getElementById('drive-sync-btn');       // 동기화
+  const db  = document.getElementById('drive-disconnect-btn'); // 연결 해제
+
+  // 연결 설정 버튼: 연결 안됐을 때만
+  if(cb)  cb.style.display  = (!isOn && !isConnecting) ? '' : 'none';
+  // 파일 생성 버튼: connecting 상태인데 fileId 없을 때
+  if(crb) crb.style.display = (isConnecting && !driveFileId) ? '' : 'none';
+  // 동기화 버튼: 연결됐고 fileId 있을 때
+  if(sb)  sb.style.display  = (isOn && driveFileId) ? '' : 'none';
+  // 연결 해제: 연결됐을 때
+  if(db)  db.style.display  = isOn ? '' : 'none';
 }
 
 function updateDriveSyncTime(){
