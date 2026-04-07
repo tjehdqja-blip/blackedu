@@ -1,0 +1,1855 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TOMAHAWK — 더블랙에듀 문제 관리</title>
+<!-- Google Identity Services + Drive API -->
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<script src="https://apis.google.com/js/api.js" async defer></script>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@300;400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#F5F3EE;--surface:#FDFCFA;--border:#DDD9D0;--border-light:#EAE7E0;
+  --text:#1A1814;--text-2:#5A5750;--text-3:#9A978F;
+  --accent:#C8960A;--accent-light:#FDF3D4;--accent-dark:#8A6500;
+  --blue:#1A5FA8;--blue-light:#E8F0FB;--teal:#0A7A5A;--teal-light:#E0F4EC;
+  --red:#B83030;--red-light:#FAEAEA;--green:#1A6B2A;--green-light:#E4F5E8;
+  --mono:'IBM Plex Mono',monospace;--sans:'IBM Plex Sans KR',sans-serif;
+  --r:6px;--rl:10px;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:var(--sans);background:var(--bg);color:var(--text);min-height:100vh;font-size:14px;line-height:1.6;}
+
+/* ── LOGIN SCREEN ── */
+#login-screen{
+  display:none;position:fixed;inset:0;background:var(--text);
+  z-index:9999;align-items:center;justify-content:center;flex-direction:column;gap:0;
+}
+#login-screen.show{display:flex;}
+.login-box{
+  background:var(--surface);border-radius:var(--rl);
+  padding:40px 44px;width:340px;border:1px solid var(--border);
+  display:flex;flex-direction:column;align-items:center;gap:0;
+}
+.login-logo{height:52px;width:auto;object-fit:contain;margin-bottom:18px;}
+.login-title{font-family:var(--mono);font-size:16px;letter-spacing:3px;color:var(--accent);margin-bottom:4px;}
+.login-sub{font-size:11px;color:var(--text-3);margin-bottom:28px;letter-spacing:0.5px;}
+.login-label{font-size:11px;font-weight:600;color:var(--text-2);align-self:flex-start;margin-bottom:5px;letter-spacing:0.5px;}
+.login-input{
+  width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:var(--r);
+  font-family:var(--sans);font-size:14px;background:var(--bg);color:var(--text);
+  outline:none;transition:border-color .15s;margin-bottom:16px;
+}
+.login-input:focus{border-color:var(--accent);}
+.login-btn{
+  width:100%;padding:10px;background:var(--accent);border:none;border-radius:var(--r);
+  font-family:var(--sans);font-size:14px;font-weight:600;color:var(--text);
+  cursor:pointer;transition:all .15s;margin-top:4px;
+}
+.login-btn:hover{background:var(--accent-dark);color:#fff;}
+.login-err{font-size:12px;color:var(--red);margin-top:10px;min-height:18px;text-align:center;}
+.login-back{font-size:12px;color:var(--text-3);margin-top:14px;cursor:pointer;text-decoration:underline;}
+.login-back:hover{color:var(--text-2);}
+
+/* ── MAIN APP (hidden until role set) ── */
+#app{display:none;}
+#app.show{display:block;}
+
+/* ── NAV ── */
+.nav{
+  background:var(--text);color:#F5F3EE;padding:0 28px;height:54px;
+  display:flex;align-items:center;justify-content:space-between;
+  position:sticky;top:0;z-index:100;
+}
+.nav-left{display:flex;align-items:center;gap:12px;}
+.nav-logo{height:34px;width:auto;object-fit:contain;display:block;flex-shrink:0;}
+.nav-divider{width:1px;height:22px;background:#3A3530;flex-shrink:0;}
+.nav-brand{font-family:var(--mono);font-size:14px;font-weight:500;letter-spacing:3px;color:var(--accent);}
+.nav-sub{font-size:11px;color:#9A978F;letter-spacing:0.5px;}
+.nav-right{display:flex;gap:8px;align-items:center;}
+.role-badge{
+  font-size:10px;font-weight:600;letter-spacing:1px;padding:3px 9px;
+  border-radius:20px;text-transform:uppercase;
+}
+.role-teacher{background:#2A2520;color:#9A978F;border:1px solid #3A3530;}
+.role-admin{background:#3A2800;color:var(--accent);border:1px solid #6A4800;}
+.btn{font-family:var(--sans);font-size:12px;padding:6px 14px;border-radius:var(--r);cursor:pointer;border:1px solid transparent;transition:all .15s;font-weight:500;}
+.btn-ghost{background:transparent;border-color:#4A4740;color:#CCC9C0;}
+.btn-ghost:hover{border-color:#8A8780;color:#F5F3EE;}
+.btn-accent{background:var(--accent);color:var(--text);border-color:var(--accent);}
+.btn-accent:hover{background:var(--accent-dark);border-color:var(--accent-dark);color:#fff;}
+.btn-primary{background:var(--text);color:#F5F3EE;border-color:var(--text);}
+.btn-primary:hover{background:#3A3530;}
+.btn-pdf{background:var(--blue);color:#fff;border-color:var(--blue);}
+.btn-pdf:hover{background:#0E4A8A;}
+.btn-danger{background:transparent;border-color:#C88080;color:var(--red);}
+.btn-danger:hover{background:var(--red-light);}
+.btn-logout{background:transparent;border-color:#4A4740;color:#9A978F;font-size:11px;padding:4px 10px;}
+.btn-logout:hover{color:#CCC9C0;}
+
+/* ── LAYOUT ── */
+.layout{display:flex;min-height:calc(100vh - 54px);}
+
+/* ── SIDEBAR ── */
+.sidebar{
+  width:200px;flex-shrink:0;background:var(--surface);
+  border-right:1px solid var(--border);padding:16px 0;
+  position:sticky;top:54px;height:calc(100vh - 54px);overflow-y:auto;
+}
+.sidebar-section{padding:0 12px 12px;}
+.sidebar-label{
+  font-size:10px;font-weight:600;letter-spacing:1.2px;
+  color:var(--text-3);text-transform:uppercase;padding:8px 4px 5px;display:block;
+}
+.sidebar-label.accent{color:var(--accent-dark);}
+.filter-item{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:6px 8px;border-radius:var(--r);cursor:pointer;
+  font-size:12px;color:var(--text-2);transition:all .1s;border:1px solid transparent;
+}
+.filter-item:hover{background:var(--bg);color:var(--text);}
+.filter-item.active{background:var(--accent-light);color:var(--accent-dark);border-color:#E8D080;font-weight:500;}
+.filter-count{font-size:10px;font-family:var(--mono);background:var(--bg);padding:1px 5px;border-radius:8px;color:var(--text-3);}
+.filter-item.active .filter-count{background:#EDD87A;color:var(--accent-dark);}
+.sidebar-divider{border:none;border-top:1px solid var(--border-light);margin:6px 12px 10px;}
+
+/* ── MAIN ── */
+.main{flex:1;min-width:0;}
+.toolbar{background:var(--surface);border-bottom:1px solid var(--border);padding:11px 20px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+.search-wrap{position:relative;flex:1;max-width:340px;}
+.search-icon{position:absolute;left:9px;top:50%;transform:translateY(-50%);color:var(--text-3);font-size:12px;}
+.search-input{width:100%;padding:7px 10px 7px 28px;border:1px solid var(--border);border-radius:var(--r);background:var(--bg);font-family:var(--sans);font-size:13px;color:var(--text);outline:none;transition:border-color .15s;}
+.search-input:focus{border-color:var(--accent);}
+.search-input::placeholder{color:var(--text-3);}
+.toolbar-right{margin-left:auto;display:flex;gap:8px;align-items:center;}
+.count-badge{font-size:12px;font-family:var(--mono);color:var(--text-3);}
+
+/* ── CARDS ── */
+.problem-list{padding:16px 20px;display:flex;flex-direction:column;gap:8px;}
+.problem-card{
+  background:var(--surface);border:1px solid var(--border);border-radius:var(--rl);
+  padding:14px 18px;cursor:pointer;transition:all .15s;display:flex;gap:14px;
+}
+.problem-card:hover{border-color:var(--accent);box-shadow:0 2px 8px rgba(0,0,0,.06);transform:translateY(-1px);}
+.card-index{font-family:var(--mono);font-size:11px;color:var(--text-3);min-width:22px;padding-top:2px;}
+.card-body{flex:1;min-width:0;}
+.card-source{font-size:11px;font-family:var(--mono);color:var(--text-3);}
+.card-title{font-size:13px;font-weight:500;color:var(--text);line-height:1.4;margin-top:3px;}
+.card-meta{display:flex;gap:5px;margin-top:7px;flex-wrap:wrap;}
+.tag{font-size:10px;padding:2px 7px;border-radius:20px;font-weight:500;border:1px solid transparent;}
+.tag-blue{background:var(--blue-light);color:var(--blue);border-color:#C0D4F0;}
+.tag-teal{background:var(--teal-light);color:var(--teal);border-color:#A0DACC;}
+.tag-amber{background:var(--accent-light);color:var(--accent-dark);border-color:#E8D080;}
+.tag-red{background:var(--red-light);color:var(--red);border-color:#F0B8B8;}
+.tag-gray{background:var(--bg);color:var(--text-2);border-color:var(--border);}
+.tag-green{background:var(--green-light);color:var(--green);border-color:#A8D8B0;}
+.card-right{display:flex;flex-direction:column;align-items:flex-end;gap:5px;}
+.time-badge{font-family:var(--mono);font-size:10px;background:var(--bg);border:1px solid var(--border);padding:2px 7px;border-radius:var(--r);color:var(--text-2);white-space:nowrap;}
+
+/* ── DETAIL MODAL ── */
+.overlay{display:none;position:fixed;inset:0;background:rgba(26,24,20,.55);z-index:200;padding:20px;overflow-y:auto;}
+#drive-setup-overlay{z-index:250;}
+.overlay.open{display:flex;justify-content:center;align-items:flex-start;}
+.detail-modal{background:var(--surface);border-radius:var(--rl);width:100%;max-width:680px;border:1px solid var(--border);overflow:hidden;}
+.modal-header{background:var(--text);padding:14px 22px;display:flex;align-items:center;justify-content:space-between;}
+.modal-brand{font-family:var(--mono);font-size:13px;letter-spacing:3px;color:var(--accent);}
+.modal-source{font-size:11px;color:#9A978F;}
+.modal-close{background:transparent;border:1px solid #4A4740;color:#CCC9C0;width:26px;height:26px;border-radius:var(--r);cursor:pointer;font-size:13px;display:flex;align-items:center;justify-content:center;}
+.modal-close:hover{background:#3A3530;}
+.modal-body{padding:22px;}
+.meta-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-bottom:18px;}
+.meta-box{background:var(--bg);border:1px solid var(--border-light);border-radius:var(--r);padding:11px 13px;}
+.meta-box-label{font-size:9px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--text-3);margin-bottom:5px;}
+.meta-box-val{font-size:12px;line-height:1.6;color:var(--text);}
+.section-sep{border:none;border-top:1px dashed var(--border);margin:18px 0;}
+.section-label{font-size:9px;font-weight:600;letter-spacing:1.5px;text-transform:uppercase;color:var(--text-3);margin-bottom:10px;border-left:2px solid var(--accent);padding-left:6px;}
+.problem-text-box{background:var(--bg);border:1px solid var(--border);border-radius:var(--r);padding:14px 16px;margin-bottom:18px;}
+.steps-list{display:flex;flex-direction:column;}
+.step-row{display:flex;gap:12px;padding:12px 0;border-bottom:1px solid var(--border-light);}
+.step-row:last-child{border-bottom:none;}
+.step-num-circle{width:30px;height:30px;border:1.5px solid var(--text);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;font-family:var(--mono);font-weight:500;flex-shrink:0;margin-top:1px;}
+.step-body{flex:1;}
+.step-main{font-size:13px;font-weight:500;margin-bottom:2px;}
+.step-sub{font-size:11px;color:var(--text-2);}
+.step-space-box{margin-top:7px;height:54px;border:1px dashed var(--border);border-radius:var(--r);}
+
+/* ── ADD MODAL ── */
+.add-overlay{display:none;position:fixed;inset:0;background:rgba(26,24,20,.55);z-index:300;padding:20px;overflow-y:auto;}
+.add-overlay.open{display:flex;justify-content:center;align-items:flex-start;}
+.add-modal{background:var(--surface);border-radius:var(--rl);width:100%;max-width:600px;border:1px solid var(--border);overflow:hidden;}
+.add-header{background:var(--text);padding:13px 20px;display:flex;align-items:center;justify-content:space-between;}
+.add-title{font-family:var(--mono);font-size:12px;color:var(--accent);letter-spacing:2px;}
+.add-body{padding:18px 20px;}
+label{font-size:11px;font-weight:600;color:var(--text-2);display:block;margin-bottom:4px;letter-spacing:.3px;}
+input[type=text],textarea,select{width:100%;border:1px solid var(--border);border-radius:var(--r);padding:7px 10px;font-family:var(--sans);font-size:13px;background:var(--bg);color:var(--text);outline:none;transition:border-color .15s;margin-bottom:11px;}
+input[type=text]:focus,textarea:focus,select:focus{border-color:var(--accent);}
+textarea{resize:vertical;min-height:70px;}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:11px;}
+.form-hint{font-size:10px;color:var(--text-3);margin-top:-7px;margin-bottom:9px;}
+.btn-ai{width:100%;padding:9px;background:var(--accent-light);border:1.5px dashed var(--accent);border-radius:var(--r);color:var(--accent-dark);font-family:var(--sans);font-size:13px;font-weight:600;cursor:pointer;transition:all .15s;margin:10px 0 14px;}
+.btn-ai:hover{background:#FBF0C0;}
+.btn-ai:disabled{opacity:.5;cursor:not-allowed;}
+.ai-result{display:none;background:var(--bg);border:1px solid var(--border-light);border-radius:var(--r);padding:10px 13px;margin-bottom:11px;font-size:12px;line-height:1.7;color:var(--text-2);}
+.ai-result.show{display:block;}
+.modal-footer{padding:13px 20px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end;background:var(--bg);}
+
+/* ── EMPTY ── */
+.empty{text-align:center;padding:60px 24px;color:var(--text-3);}
+.empty-icon{font-size:32px;margin-bottom:10px;}
+
+/* ── TOAST ── */
+.toast{position:fixed;bottom:22px;right:22px;background:var(--text);color:#F5F3EE;font-size:12px;padding:9px 16px;border-radius:var(--r);z-index:999;opacity:0;transform:translateY(6px);transition:all .25s;pointer-events:none;}
+.toast.show{opacity:1;transform:translateY(0);}
+
+/* ── API KEY SETUP ── */
+#apikey-banner{
+  background:#1A3A60;border-bottom:1px solid #2A5A90;
+  padding:10px 28px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+}
+.apikey-label{font-size:12px;color:#A0C4E8;white-space:nowrap;}
+.apikey-input-wrap{display:flex;gap:8px;flex:1;min-width:220px;}
+.apikey-input{
+  flex:1;padding:6px 10px;border:1px solid #2A5A90;border-radius:var(--r);
+  background:#0E2540;color:#E0F0FF;font-family:var(--mono);font-size:12px;
+  outline:none;transition:border-color .15s;
+}
+.apikey-input:focus{border-color:#5AA0D8;}
+.apikey-input::placeholder{color:#4A7A9A;}
+.apikey-save{
+  padding:6px 14px;background:#1A5FA8;border:none;border-radius:var(--r);
+  color:#fff;font-family:var(--sans);font-size:12px;font-weight:500;cursor:pointer;
+  white-space:nowrap;transition:background .15s;
+}
+.apikey-save:hover{background:#0E4A8A;}
+.apikey-status{font-size:11px;white-space:nowrap;}
+.apikey-ok{color:#5DCAA5;}
+.apikey-no{color:#F0A080;}
+.apikey-help{font-size:10px;color:#4A7A9A;margin-left:4px;}
+.apikey-test{
+  padding:6px 12px;background:transparent;border:1px solid #3A7A50;border-radius:var(--r);
+  color:#5DCAA5;font-family:var(--sans);font-size:12px;font-weight:500;cursor:pointer;
+  white-space:nowrap;transition:all .15s;
+}
+.apikey-test:hover{background:#0A2A1A;}
+.apikey-test:disabled{opacity:0.5;cursor:not-allowed;}
+.apikey-debug{font-size:10px;color:#4A7A9A;margin-top:4px;}
+
+/* ── 모바일 파일 업로드 (label 방식) ── */
+.file-label-btn{
+  display:flex;align-items:center;justify-content:center;gap:6px;
+  flex:1;padding:10px 10px;border-radius:var(--r);
+  font-family:var(--sans);font-size:13px;font-weight:500;cursor:pointer;
+  border:1px solid var(--border);background:var(--surface);color:var(--text-2);
+  transition:all .15s;text-align:center;user-select:none;-webkit-user-select:none;
+}
+.file-label-btn:hover,.file-label-btn:active{background:var(--bg);border-color:var(--text-2);}
+.file-label-camera{background:var(--accent-light);border-color:var(--accent);color:var(--accent-dark);}
+.file-label-camera:hover,.file-label-camera:active{background:#FBF0C0;}
+.file-input-hidden{
+  position:absolute;width:1px;height:1px;opacity:0;overflow:hidden;
+  pointer-events:none;
+}
+
+/* ── GOOGLE DRIVE ── */
+#drive-banner{
+  background:#0D3B26;border-bottom:1px solid #1A5C3A;
+  padding:8px 28px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+}
+.drive-status-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
+.drive-status-dot.off{background:#6A6760;}
+.drive-status-dot.connecting{background:#C8960A;animation:pulse .8s ease-in-out infinite;}
+.drive-status-dot.on{background:#1D9E75;}
+.drive-status-dot.error{background:#B83030;}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+.drive-label{font-size:12px;color:#5DCAA5;white-space:nowrap;display:flex;align-items:center;gap:6px;}
+.drive-info{font-size:11px;color:#3A7A5A;flex:1;}
+.drive-btn{
+  padding:5px 12px;border-radius:var(--r);font-family:var(--sans);font-size:11px;
+  font-weight:500;cursor:pointer;border:1px solid;transition:all .15s;white-space:nowrap;
+}
+.drive-btn-connect{background:#1A5FA8;border-color:#1A5FA8;color:#fff;}
+.drive-btn-connect:hover{background:#0E4A8A;}
+.drive-btn-disconnect{background:transparent;border-color:#3A7A5A;color:#5DCAA5;}
+.drive-btn-disconnect:hover{background:#0A2A1A;}
+.drive-btn-sync{background:#0F6E56;border-color:#0F6E56;color:#fff;}
+.drive-btn-sync:hover{background:#085041;}
+.drive-setup-box{
+  background:var(--surface);border:1px solid var(--border);border-radius:var(--rl);
+  padding:24px 28px;max-width:520px;margin:0 auto;
+}
+.drive-setup-title{font-size:15px;font-weight:500;margin-bottom:6px;}
+.drive-setup-desc{font-size:12px;color:var(--text-2);line-height:1.7;margin-bottom:16px;}
+.drive-setup-steps{counter-reset:step;}
+.drive-setup-step{
+  display:flex;gap:12px;margin-bottom:12px;
+  font-size:12px;color:var(--text-2);line-height:1.6;
+}
+.step-num{
+  width:22px;height:22px;border-radius:50%;background:var(--accent);
+  color:var(--text);font-size:11px;font-weight:600;
+  display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px;
+}
+.drive-client-input{
+  width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:var(--r);
+  font-family:var(--mono);font-size:11px;background:var(--bg);color:var(--text);
+  outline:none;margin:6px 0 10px;
+}
+.drive-client-input:focus{border-color:var(--accent);}
+.drive-file-input{
+  width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:var(--r);
+  font-family:var(--sans);font-size:12px;background:var(--bg);color:var(--text);
+  outline:none;margin:4px 0 10px;
+}
+.drive-file-input:focus{border-color:var(--accent);}
+.drive-connect-btn{
+  width:100%;padding:10px;background:#1A5FA8;border:none;border-radius:var(--r);
+  color:#fff;font-family:var(--sans);font-size:13px;font-weight:600;
+  cursor:pointer;transition:all .15s;display:flex;align-items:center;justify-content:center;gap:8px;
+}
+.drive-connect-btn:hover{background:#0E4A8A;}
+.drive-connect-btn:disabled{opacity:.5;cursor:not-allowed;}
+.drive-alt-row{margin-top:12px;text-align:center;font-size:11px;color:var(--text-3);}
+.drive-alt-link{color:var(--blue);cursor:pointer;text-decoration:underline;}
+.drive-sync-info{
+  font-size:11px;color:var(--text-3);padding:4px 8px;background:var(--bg);
+  border-radius:var(--r);border:0.5px solid var(--border);
+}
+
+/* ── ENTRY SCREEN ── */
+#entry-screen{
+  display:flex;position:fixed;inset:0;background:var(--text);
+  z-index:9998;align-items:center;justify-content:center;
+}
+.entry-box{display:flex;flex-direction:column;align-items:center;gap:0;}
+.entry-logo{height:72px;width:auto;object-fit:contain;margin-bottom:20px;}
+.entry-title{font-family:var(--mono);font-size:18px;letter-spacing:4px;color:var(--accent);margin-bottom:6px;}
+.entry-sub{font-size:12px;color:#6A6760;margin-bottom:36px;letter-spacing:1px;}
+.entry-btns{display:flex;gap:12px;}
+.entry-btn{
+  padding:11px 32px;border-radius:var(--r);font-family:var(--sans);font-size:14px;
+  font-weight:600;cursor:pointer;transition:all .15s;border:1.5px solid;
+}
+.entry-teacher{background:transparent;border-color:#4A4740;color:#CCC9C0;}
+.entry-teacher:hover{background:#2A2520;border-color:#6A6560;}
+.entry-admin{background:var(--accent);border-color:var(--accent);color:var(--text);}
+.entry-admin:hover{background:var(--accent-dark);border-color:var(--accent-dark);color:#fff;}
+
+@media(max-width:700px){.sidebar{display:none;}.meta-grid{grid-template-columns:1fr;}.form-row{grid-template-columns:1fr;}}
+
+/* ── IMAGE UPLOAD ── */
+.input-tabs{display:flex;gap:0;margin-bottom:14px;border:1px solid var(--border);border-radius:var(--r);overflow:hidden;}
+.itab{flex:1;padding:8px 10px;background:transparent;border:none;font-family:var(--sans);font-size:12px;font-weight:500;cursor:pointer;color:var(--text-2);transition:all .15s;}
+.itab:hover{background:var(--bg);}
+.itab.active{background:var(--text);color:#F5F3EE;}
+.img-upload-zone{
+  border:1.5px dashed var(--border);border-radius:var(--r);min-height:160px;
+  display:flex;align-items:center;justify-content:center;cursor:pointer;
+  transition:border-color .15s;margin-bottom:10px;padding:12px;
+  background:var(--bg);position:relative;overflow:hidden;
+}
+.img-upload-zone:hover{border-color:var(--accent);}
+.img-upload-zone.dragover{border-color:var(--accent);background:var(--accent-light);}
+.img-upload-inner{display:flex;flex-direction:column;align-items:center;gap:6px;}
+.img-upload-icon{font-size:28px;}
+.img-upload-text{font-size:13px;font-weight:500;color:var(--text-2);}
+.img-upload-sub{font-size:11px;color:var(--text-3);}
+.img-btn-row{display:flex;gap:8px;margin-bottom:10px;}
+.img-btn{flex:1;padding:8px 10px;border-radius:var(--r);font-family:var(--sans);font-size:12px;font-weight:500;cursor:pointer;border:1px solid var(--border);background:var(--surface);color:var(--text-2);transition:all .15s;}
+.img-btn:hover{background:var(--bg);border-color:var(--text-2);}
+.img-btn-camera{background:var(--accent-light);border-color:var(--accent);color:var(--accent-dark);}
+.img-btn-camera:hover{background:#FBF0C0;}
+.img-btn-clear{background:var(--red-light);border-color:var(--red);color:var(--red);}
+.img-btn-clear:hover{background:#F7D0D0;}
+
+/* 촬영 팁 */
+.photo-tips{display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap;}
+.photo-tip{font-size:11px;background:var(--blue-light);color:var(--blue);border:1px solid #C0D4F0;border-radius:20px;padding:3px 9px;}
+
+/* 이미지 품질 표시 */
+.img-quality-bar{margin-bottom:8px;padding:8px 10px;border-radius:var(--r);font-size:11px;display:none;border:1px solid var(--border);}
+.img-quality-bar.good{background:var(--teal-light);color:var(--teal);border-color:#A0DACC;display:flex;}
+.img-quality-bar.warn{background:#FFF8E0;color:#7A5800;border-color:#E8D080;display:flex;}
+.img-quality-bar.bad{background:var(--red-light);color:var(--red);border-color:#F0B8B8;display:flex;}
+.img-quality-icon{margin-right:6px;font-size:13px;}
+
+/* OCR 진행 단계 */
+.ocr-stages{display:none;margin-bottom:10px;}
+.ocr-stages.show{display:flex;flex-direction:column;gap:4px;}
+.ocr-stage{display:flex;align-items:center;gap:8px;font-size:11px;padding:5px 8px;border-radius:var(--r);background:var(--bg);color:var(--text-3);}
+.ocr-stage.active{background:var(--accent-light);color:var(--accent-dark);}
+.ocr-stage.done{background:var(--teal-light);color:var(--teal);}
+.ocr-stage.error{background:var(--red-light);color:var(--red);}
+.stage-dot{width:8px;height:8px;border-radius:50%;background:currentColor;flex-shrink:0;}
+
+/* 재시도 버튼 */
+.retry-row{display:flex;gap:8px;margin-top:8px;}
+.btn-retry{flex:1;padding:7px;border-radius:var(--r);font-family:var(--sans);font-size:12px;font-weight:500;cursor:pointer;border:1px solid var(--border);background:var(--surface);color:var(--text-2);transition:all .15s;}
+.btn-retry:hover{border-color:var(--accent);color:var(--accent-dark);background:var(--accent-light);}
+.btn-retry-struct{background:var(--blue-light);border-color:#C0D4F0;color:var(--blue);}
+.btn-retry-struct:hover{background:#CCDFF8;}
+</style>
+</head>
+<body>
+
+<!-- ── ENTRY SCREEN ── -->
+<div id="entry-screen">
+  <div class="entry-box">
+    <img class="entry-logo" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACgAAAAoCAYAAACM/rhtAAADd0lEQVR42u2YTWwUZRjHf+87M9vO7uxSqN1UallbS0N3K0q0bYyHevGCBiFeDCREwVii8WbgYDx4MH603j148WLChaOJBaVVUxVNDBW6UJBCSwulH9APdrfuzvt4WLaJCSR2V7c12ec2mWTe3/zn/zzPP6NERNjApdngVQGsAFYA/++AdqkPuN8YVUptDEAReQCM4PsGy7JKBlSlbpJcLreqogIEcBxnfRU0vo+2LE71f827x47iRcIY36AUKIRgyOPFvS/zRk9PyZ/dLsV34+PXuJgcoTYaxc9mEWAlB/URxfvHBhn74zIf9fZhjCkasKQuDgQCuMEg1VXVOFUuEc9lf1eYHQ0e8e2NfPnF5/z6yxm01hjjlx9QRDDGgBhWcoadWxW9eyx6nlFMLwpifH4cGsrbwsj6zUEBbA1TC8LwDTgxLIgYMjlFNFpHKX34rwA6FtxOCbsesTh9cYXPBhcQFI6lWVpcQim1Ph4E8AVmloXu1io6GoUTo5t4rjPOSmaFkOfR9/GHXLt6Fcuy8nYoJ6ACaoKa3XGbnbXLHD1+k3fe+4Cv+k8SCofRWnN7fp6B09/c82GZAJVSSDZFSO7QVKuZTSlSrQd5+NE2NoeDOIEqvJCH7/sorUmn0+X1oIignCAZp46hSymWq2P0fdrLocOvcWdh4W9NYVkWHZ1d+cO0Lg+gZduICHte2st3P3xPdEsE3/fJ+f7qfk6nU0xNTvHqodd56ukOjDFFAdrFqFdQKOR5PP7kLpoea0FrTTgcwXVdjDG0Jdo53HOEI2+9je/7xfu8lLDw4DSzDnmwADMxPsH09E1c16Ut3sa5388zc+sWLa2tTF6fYH5ujlhsG/Gtht/OXUdCDaRSS9i2Q2dXF7Zt/zeAxuTz3Zmff0JrzYVkkuaW7QwODPLtqZO8sv8Ao6OjXBqbZHf3EySSxxnoT1Hd+SY6u0S1GySRSLCppmZNyv9j1xYMnmhvxwlUsbkmAndvINm7pNMZonVbeOH5Z4k/9CeBpcvQ/QluYh+ZxTlyvmH47FlmZmfL58ErV8ZoaqwnOXKe0QtJOnZEaaivIZWBWerZFosxMpLEthReOEImnaapuXnNnl0z4Gp6vs9Bcm+75C8MqNJXfdEKFnxkjEFE0FqjEArhv3BP5d8GRFBFzEFV+btVAawAVgArgBXAkuovDx1632tvpzgAAAAASUVORK5CYII=" alt="더블랙에듀">
+    <div class="entry-title">TOMAHAWK</div>
+    <div class="entry-sub">더블랙에듀 문제 관리 시스템</div>
+    <div class="entry-btns">
+      <button class="entry-btn entry-teacher" onclick="enterAsTeacher()">선생님으로 입장</button>
+      <button class="entry-btn entry-admin" onclick="showAdminLogin()">관리자 로그인</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── ADMIN LOGIN ── -->
+<div id="login-screen">
+  <div class="login-box">
+    <img class="login-logo" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACgAAAAoCAYAAACM/rhtAAADd0lEQVR42u2YTWwUZRjHf+87M9vO7uxSqN1UallbS0N3K0q0bYyHevGCBiFeDCREwVii8WbgYDx4MH603j148WLChaOJBaVVUxVNDBW6UJBCSwulH9APdrfuzvt4WLaJCSR2V7c12ec2mWTe3/zn/zzPP6NERNjApdngVQGsAFYA/++AdqkPuN8YVUptDEAReQCM4PsGy7JKBlSlbpJcLreqogIEcBxnfRU0vo+2LE71f827x47iRcIY36AUKIRgyOPFvS/zRk9PyZ/dLsV34+PXuJgcoTYaxc9mEWAlB/URxfvHBhn74zIf9fZhjCkasKQuDgQCuMEg1VXVOFUuEc9lf1eYHQ0e8e2NfPnF5/z6yxm01hjjlx9QRDDGgBhWcoadWxW9eyx6nlFMLwpifH4cGsrbwsj6zUEBbA1TC8LwDTgxLIgYMjlFNFpHKX34rwA6FtxOCbsesTh9cYXPBhcQFI6lWVpcQim1Ph4E8AVmloXu1io6GoUTo5t4rjPOSmaFkOfR9/GHXLt6Fcuy8nYoJ6ACaoKa3XGbnbXLHD1+k3fe+4Cv+k8SCofRWnN7fp6B09/c82GZAJVSSDZFSO7QVKuZTSlSrQd5+NE2NoeDOIEqvJCH7/sorUmn0+X1oIignCAZp46hSymWq2P0fdrLocOvcWdh4W9NYVkWHZ1d+cO0Lg+gZduICHte2st3P3xPdEsE3/fJ+f7qfk6nU0xNTvHqodd56ukOjDFFAdrFqFdQKOR5PP7kLpoea0FrTTgcwXVdjDG0Jdo53HOEI2+9je/7xfu8lLDw4DSzDnmwADMxPsH09E1c16Ut3sa5388zc+sWLa2tTF6fYH5ujlhsG/Gtht/OXUdCDaRSS9i2Q2dXF7Zt/zeAxuTz3Zmff0JrzYVkkuaW7QwODPLtqZO8sv8Ao6OjXBqbZHf3EySSxxnoT1Hd+SY6u0S1GySRSLCppmZNyv9j1xYMnmhvxwlUsbkmAndvINm7pNMZonVbeOH5Z4k/9CeBpcvQ/QluYh+ZxTlyvmH47FlmZmfL58ErV8ZoaqwnOXKe0QtJOnZEaaivIZWBWerZFosxMpLEthReOEImnaapuXnNnl0z4Gp6vs9Bcm+75C8MqNJXfdEKFnxkjEFE0FqjEArhv3BP5d8GRFBFzEFV+btVAawAVgArgBXAkuovDx1632tvpzgAAAAASUVORK5CYII=" alt="더블랙에듀">
+    <div class="login-title">ADMIN</div>
+    <div class="login-sub">관리자 전용 로그인</div>
+    <label class="login-label">비밀번호</label>
+    <input class="login-input" type="password" id="pw-input" placeholder="비밀번호를 입력하세요" onkeydown="if(event.key==='Enter')doLogin()">
+    <button class="login-btn" onclick="doLogin()">로그인</button>
+    <div class="login-err" id="login-err"></div>
+    <span class="login-back" onclick="backToEntry()">← 선생님으로 입장하기</span>
+  </div>
+</div>
+
+<!-- ── MAIN APP ── -->
+<div id="app">
+<nav class="nav">
+  <div class="nav-left">
+    <img class="nav-logo" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACgAAAAoCAYAAACM/rhtAAADd0lEQVR42u2YTWwUZRjHf+87M9vO7uxSqN1UallbS0N3K0q0bYyHevGCBiFeDCREwVii8WbgYDx4MH603j148WLChaOJBaVVUxVNDBW6UJBCSwulH9APdrfuzvt4WLaJCSR2V7c12ec2mWTe3/zn/zzPP6NERNjApdngVQGsAFYA/++AdqkPuN8YVUptDEAReQCM4PsGy7JKBlSlbpJcLreqogIEcBxnfRU0vo+2LE71f827x47iRcIY36AUKIRgyOPFvS/zRk9PyZ/dLsV34+PXuJgcoTYaxc9mEWAlB/URxfvHBhn74zIf9fZhjCkasKQuDgQCuMEg1VXVOFUuEc9lf1eYHQ0e8e2NfPnF5/z6yxm01hjjlx9QRDDGgBhWcoadWxW9eyx6nlFMLwpifH4cGsrbwsj6zUEBbA1TC8LwDTgxLIgYMjlFNFpHKX34rwA6FtxOCbsesTh9cYXPBhcQFI6lWVpcQim1Ph4E8AVmloXu1io6GoUTo5t4rjPOSmaFkOfR9/GHXLt6Fcuy8nYoJ6ACaoKa3XGbnbXLHD1+k3fe+4Cv+k8SCofRWnN7fp6B09/c82GZAJVSSDZFSO7QVKuZTSlSrQd5+NE2NoeDOIEqvJCH7/sorUmn0+X1oIignCAZp46hSymWq2P0fdrLocOvcWdh4W9NYVkWHZ1d+cO0Lg+gZduICHte2st3P3xPdEsE3/fJ+f7qfk6nU0xNTvHqodd56ukOjDFFAdrFqFdQKOR5PP7kLpoea0FrTTgcwXVdjDG0Jdo53HOEI2+9je/7xfu8lLDw4DSzDnmwADMxPsH09E1c16Ut3sa5388zc+sWLa2tTF6fYH5ujlhsG/Gtht/OXUdCDaRSS9i2Q2dXF7Zt/zeAxuTz3Zmff0JrzYVkkuaW7QwODPLtqZO8sv8Ao6OjXBqbZHf3EySSxxnoT1Hd+SY6u0S1GySRSLCppmZNyv9j1xYMnmhvxwlUsbkmAndvINm7pNMZonVbeOH5Z4k/9CeBpcvQ/QluYh+ZxTlyvmH47FlmZmfL58ErV8ZoaqwnOXKe0QtJOnZEaaivIZWBWerZFosxMpLEthReOEImnaapuXnNnl0z4Gp6vs9Bcm+75C8MqNJXfdEKFnxkjEFE0FqjEArhv3BP5d8GRFBFzEFV+btVAawAVgArgBXAkuovDx1632tvpzgAAAAASUVORK5CYII=" alt="더블랙에듀">
+    <div class="nav-divider"></div>
+    <span class="nav-brand">TOMAHAWK</span>
+    <span class="nav-sub">문제 관리 시스템</span>
+  </div>
+  <div class="nav-right">
+    <span class="role-badge" id="role-badge"></span>
+    <!-- 관리자 전용 버튼 -->
+    <button class="btn btn-ghost admin-only" id="export-btn" onclick="exportAll()">내보내기</button>
+    <button class="btn btn-pdf" onclick="printFiltered()">🖨 목록 출력</button>
+    <button class="btn btn-accent" id="add-btn" onclick="openAdd()">+ 문제 추가</button>
+    <button class="btn btn-logout" onclick="logout()">로그아웃</button>
+  </div>
+</nav>
+
+<!-- GOOGLE DRIVE 배너 -->
+<div id="drive-banner">
+  <span class="drive-status-dot off" id="drive-dot"></span>
+  <span class="drive-label" id="drive-label">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" style="flex-shrink:0">
+      <path d="M6.5 20L2 12l4.5-8h11L22 12l-4.5 8z" stroke="#5DCAA5" stroke-width="1.5" fill="none"/>
+      <path d="M8.5 20l4-7 4 7M2 12h20M6.5 4l4 7" stroke="#5DCAA5" stroke-width="1.5" fill="none"/>
+    </svg>
+    구글 드라이브 저장소
+  </span>
+  <span class="drive-info" id="drive-info">연결되지 않음 — 설정하면 모든 선생님이 실시간으로 문제를 공유합니다</span>
+  <button class="drive-btn drive-btn-connect" id="drive-connect-btn" onclick="openDriveSetup()">연결 설정</button>
+  <button class="drive-btn drive-btn-sync" id="drive-sync-btn" onclick="driveSync()" style="display:none;">↻ 동기화</button>
+  <button class="drive-btn drive-btn-disconnect" id="drive-disconnect-btn" onclick="driveDisconnect()" style="display:none;">연결 해제</button>
+  <span class="drive-sync-info" id="drive-sync-time" style="display:none;"></span>
+</div>
+
+<!-- DRIVE 설정 오버레이 -->
+<div class="overlay" id="drive-setup-overlay" onclick="closeDriveSetup(event)" style="display:none;">
+  <div class="drive-setup-box" style="margin-top:60px;">
+    <div class="drive-setup-title">🔗 구글 드라이브 연결 설정</div>
+    <div class="drive-setup-desc">
+      구글 드라이브에 문제 데이터를 저장하면, 학원 내 모든 선생님이 같은 데이터를 실시간으로 공유할 수 있습니다.<br>
+      처음 한 번만 설정하면 이후에는 자동으로 연결됩니다.
+    </div>
+
+    <div style="border:0.5px solid var(--border);border-radius:var(--r);padding:14px;margin-bottom:16px;background:var(--bg);">
+      <div style="font-size:11px;font-weight:600;color:var(--text-2);margin-bottom:10px;letter-spacing:0.5px;">STEP 1 — Google Cloud 설정 (관리자 1회)</div>
+      <div class="drive-setup-step"><span class="step-num">1</span><span>Google Cloud Console (<a href="https://console.cloud.google.com" target="_blank" style="color:var(--blue);">console.cloud.google.com</a>) 접속 → 새 프로젝트 생성</span></div>
+      <div class="drive-setup-step"><span class="step-num">2</span><span>왼쪽 메뉴 → API 및 서비스 → 라이브러리 → <strong>Google Drive API</strong> 검색 → 사용 설정</span></div>
+      <div class="drive-setup-step"><span class="step-num">3</span><span>사용자 인증 정보 → OAuth 2.0 클라이언트 ID 만들기 → 유형: <strong>웹 애플리케이션</strong></span></div>
+      <div class="drive-setup-step"><span class="step-num">4</span><span>승인된 JavaScript 원본에 이 앱이 열리는 주소 추가 (예: <code style="font-size:10px;background:var(--border-light);padding:1px 4px;border-radius:3px;">https://claude.ai</code>)</span></div>
+      <div class="drive-setup-step"><span class="step-num">5</span><span>생성된 <strong>클라이언트 ID</strong> 복사</span></div>
+    </div>
+
+    <label style="font-size:11px;font-weight:600;color:var(--text-2);">Google OAuth 클라이언트 ID</label>
+    <input class="drive-client-input" type="text" id="drive-client-id-input"
+      placeholder="123456789-abc.apps.googleusercontent.com"
+      value="">
+
+    <div style="border:0.5px solid var(--border);border-radius:var(--r);padding:14px;margin-bottom:16px;background:var(--bg);">
+      <div style="font-size:11px;font-weight:600;color:var(--text-2);margin-bottom:10px;letter-spacing:0.5px;">STEP 2 — 공유 파일 ID (선택사항)</div>
+      <div style="font-size:11px;color:var(--text-3);line-height:1.6;margin-bottom:8px;">
+        처음 연결 시 자동으로 Drive에 <code style="background:var(--border-light);padding:1px 4px;border-radius:3px;">tomahawk_problems.json</code> 파일이 생성됩니다.<br>
+        <strong>여러 선생님이 같은 파일을 공유</strong>하려면: 관리자가 파일 ID를 복사해서 다른 선생님들에게 전달하세요.
+      </div>
+      <label style="font-size:11px;font-weight:600;color:var(--text-2);">파일 ID (기존 공유 파일 연결 시 입력)</label>
+      <input class="drive-file-input" type="text" id="drive-file-id-input"
+        placeholder="1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms (없으면 비워두세요)">
+    </div>
+
+    <button class="drive-connect-btn" id="drive-connect-go-btn" onclick="initGoogleDrive()">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M6.5 20L2 12l4.5-8h11L22 12l-4.5 8z" stroke="#fff" stroke-width="1.5"/></svg>
+      구글 드라이브 연결하기
+    </button>
+
+    <div class="drive-alt-row">
+      파일 ID를 모르면 <span class="drive-alt-link" onclick="closeDriveSetupPanel()">나중에 설정</span>하거나,
+      <span class="drive-alt-link" onclick="useLocalFallback()">로컬 저장으로 임시 사용</span>
+    </div>
+  </div>
+</div>
+
+<!-- API KEY 배너 -->
+<div id="apikey-banner">
+  <span class="apikey-label">🔑 API 키</span>
+  <div class="apikey-input-wrap">
+    <input class="apikey-input" type="text" id="apikey-input"
+      placeholder="sk-ant-api03-... 전체 키를 붙여넣으세요"
+      oninput="onApiKeyInput()" autocomplete="off" autocorrect="off"
+      autocapitalize="off" spellcheck="false">
+    <button class="apikey-save" onclick="saveApiKey()">적용</button>
+    <button class="apikey-test" id="apikey-test-btn" onclick="testApiKey()" disabled>연결 테스트</button>
+  </div>
+  <span class="apikey-status" id="apikey-status"><span class="apikey-no">● 미설정</span></span>
+  <span class="apikey-help">
+    <a href="https://console.anthropic.com/settings/keys" target="_blank"
+       style="color:#4A7A9A;font-size:10px;text-decoration:underline;">
+       키 발급 →
+    </a>
+  </span>
+</div>
+
+<div class="layout">
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <div class="sidebar-section">
+      <span class="sidebar-label">전체</span>
+      <div class="filter-item active" data-filter="all" onclick="setFilter('all',this)">전체 문제 <span class="filter-count" id="cnt-all">0</span></div>
+    </div>
+    <hr class="sidebar-divider">
+    <div class="sidebar-section">
+      <span class="sidebar-label">난이도</span>
+      <div class="filter-item" data-filter="diff-5" onclick="setFilter('diff-5',this)">킬러 <span class="filter-count" id="cnt-d5">0</span></div>
+      <div class="filter-item" data-filter="diff-4" onclick="setFilter('diff-4',this)">준킬러 <span class="filter-count" id="cnt-d4">0</span></div>
+      <div class="filter-item" data-filter="diff-3" onclick="setFilter('diff-3',this)">고난도 <span class="filter-count" id="cnt-d3">0</span></div>
+      <div class="filter-item" data-filter="diff-2" onclick="setFilter('diff-2',this)">중급 <span class="filter-count" id="cnt-d2">0</span></div>
+      <div class="filter-item" data-filter="diff-1" onclick="setFilter('diff-1',this)">기본 <span class="filter-count" id="cnt-d1">0</span></div>
+    </div>
+    <hr class="sidebar-divider">
+    <div class="sidebar-section">
+      <span class="sidebar-label accent">중등</span>
+      <div class="filter-item" data-filter="subj-중1-1" onclick="setFilter('subj-중1-1',this)">1-1 <span class="filter-count" id="cnt-m11">0</span></div>
+      <div class="filter-item" data-filter="subj-중1-2" onclick="setFilter('subj-중1-2',this)">1-2 <span class="filter-count" id="cnt-m12">0</span></div>
+      <div class="filter-item" data-filter="subj-중2-1" onclick="setFilter('subj-중2-1',this)">2-1 <span class="filter-count" id="cnt-m21">0</span></div>
+      <div class="filter-item" data-filter="subj-중2-2" onclick="setFilter('subj-중2-2',this)">2-2 <span class="filter-count" id="cnt-m22">0</span></div>
+      <div class="filter-item" data-filter="subj-중3-1" onclick="setFilter('subj-중3-1',this)">3-1 <span class="filter-count" id="cnt-m31">0</span></div>
+      <div class="filter-item" data-filter="subj-중3-2" onclick="setFilter('subj-중3-2',this)">3-2 <span class="filter-count" id="cnt-m32">0</span></div>
+    </div>
+    <hr class="sidebar-divider">
+    <div class="sidebar-section">
+      <span class="sidebar-label accent">고등 (22개정)</span>
+      <div class="filter-item" data-filter="subj-공수1" onclick="setFilter('subj-공수1',this)">공통수학1 <span class="filter-count" id="cnt-h1">0</span></div>
+      <div class="filter-item" data-filter="subj-공수2" onclick="setFilter('subj-공수2',this)">공통수학2 <span class="filter-count" id="cnt-h2">0</span></div>
+      <div class="filter-item" data-filter="subj-대수" onclick="setFilter('subj-대수',this)">대수 <span class="filter-count" id="cnt-ha">0</span></div>
+      <div class="filter-item" data-filter="subj-미적1" onclick="setFilter('subj-미적1',this)">미적분Ⅰ <span class="filter-count" id="cnt-hc1">0</span></div>
+      <div class="filter-item" data-filter="subj-미적2" onclick="setFilter('subj-미적2',this)">미적분Ⅱ <span class="filter-count" id="cnt-hc2">0</span></div>
+      <div class="filter-item" data-filter="subj-기하" onclick="setFilter('subj-기하',this)">기하 <span class="filter-count" id="cnt-hg">0</span></div>
+    </div>
+  </aside>
+
+  <main class="main">
+    <div class="toolbar">
+      <div class="search-wrap">
+        <span class="search-icon">🔍</span>
+        <input class="search-input" id="search" placeholder="문제, 단원, 개념 검색..." oninput="renderList()">
+      </div>
+      <div class="toolbar-right">
+        <span class="count-badge" id="count-label">0문제</span>
+      </div>
+    </div>
+    <div class="problem-list" id="problem-list"></div>
+  </main>
+</div>
+</div><!-- #app -->
+
+<!-- DETAIL OVERLAY -->
+<div class="overlay" id="detail-overlay" onclick="closeDetail(event)">
+  <div class="detail-modal"><div id="detail-content"></div></div>
+</div>
+
+<!-- ADD OVERLAY -->
+<div class="add-overlay" id="add-overlay" onclick="closeAdd(event)">
+  <div class="add-modal">
+    <div class="add-header">
+      <span class="add-title">문제 추가</span>
+      <button class="modal-close" onclick="document.getElementById('add-overlay').classList.remove('open')">✕</button>
+    </div>
+    <div class="add-body">
+
+      <!-- ── STEP 1: 입력 방식 탭 ── -->
+      <div class="input-tabs">
+        <button class="itab active" id="tab-text" onclick="switchTab('text')">✏️ 텍스트 입력</button>
+        <button class="itab" id="tab-image" onclick="switchTab('image')">📷 사진 촬영 / 업로드</button>
+      </div>
+
+      <!-- 텍스트 입력 패널 -->
+      <div id="panel-text">
+        <label>문제 원문</label>
+        <textarea id="f-problem" placeholder="문제 전체 텍스트를 붙여넣으세요..."></textarea>
+      </div>
+
+      <!-- 이미지 패널 -->
+      <div id="panel-image" style="display:none;">
+
+        <!-- 촬영 팁 -->
+        <div class="photo-tips">
+          <span class="photo-tip">☀️ 밝은 곳에서 촬영</span>
+          <span class="photo-tip">📐 문제 전체가 프레임 안에</span>
+          <span class="photo-tip">🚫 그림자·반사 없게</span>
+          <span class="photo-tip">📏 최대한 정면에서</span>
+        </div>
+
+        <label class="img-upload-zone" id="img-drop-zone" for="img-file-input"
+          ondragover="event.preventDefault();this.classList.add('dragover')"
+          ondragleave="this.classList.remove('dragover')"
+          ondrop="handleDrop(event)"
+          style="cursor:pointer;">
+          <div class="img-upload-inner" id="img-placeholder">
+            <div class="img-upload-icon">📷</div>
+            <div class="img-upload-text">탭하여 갤러리에서 선택</div>
+            <div class="img-upload-sub">또는 카메라로 직접 촬영</div>
+          </div>
+          <canvas id="img-canvas" style="display:none;max-width:100%;max-height:220px;border-radius:4px;"></canvas>
+        </div>
+
+        <!-- 모바일 호환: label 방식 (display:none input은 모바일 Chrome에서 차단됨) -->
+        <input class="file-input-hidden" type="file" id="img-file-input"
+               accept="image/*" onchange="handleFileSelect(event)">
+        <input class="file-input-hidden" type="file" id="img-camera-input"
+               accept="image/*" capture="environment" onchange="handleFileSelect(event)">
+
+        <!-- 이미지 품질 표시 -->
+        <div class="img-quality-bar" id="img-quality-bar">
+          <span class="img-quality-icon" id="img-quality-icon"></span>
+          <span id="img-quality-text"></span>
+        </div>
+
+        <div class="img-btn-row">
+          <!-- label for= 방식: 모바일 Chrome에서 가장 안정적 -->
+          <label class="file-label-btn" for="img-file-input">🖼 갤러리</label>
+          <label class="file-label-btn file-label-camera" for="img-camera-input">📷 카메라 촬영</label>
+          <button class="img-btn img-btn-clear" id="img-clear-btn" onclick="clearImage()" style="display:none;">✕ 삭제</button>
+        </div>
+
+        <button class="btn-ai" id="ocr-btn" onclick="ocrAndStructure()" style="display:none;">✦ 문제 인식 시작</button>
+
+        <!-- 단계별 진행 표시 -->
+        <div class="ocr-stages" id="ocr-stages">
+          <div class="ocr-stage" id="stage-preprocess"><span class="stage-dot"></span>이미지 전처리 중...</div>
+          <div class="ocr-stage" id="stage-ocr"><span class="stage-dot"></span>문제 텍스트 인식 중...</div>
+          <div class="ocr-stage" id="stage-struct"><span class="stage-dot"></span>풀이 단계 구조화 중...</div>
+        </div>
+
+        <div class="ai-result" id="ocr-result"></div>
+
+        <!-- 재시도 버튼 (오류 시 노출) -->
+        <div class="retry-row" id="retry-row" style="display:none;">
+          <button class="btn-retry" onclick="ocrAndStructure()">🔄 전체 재시도</button>
+          <button class="btn-retry btn-retry-struct" onclick="structureFromOcrText()">✦ 텍스트만 재구조화</button>
+        </div>
+
+        <!-- 인식된 텍스트 확인/수정 -->
+        <div id="ocr-text-wrap" style="display:none;">
+          <label>인식된 문제 텍스트 <span style="color:var(--text-3);font-weight:400;">(직접 수정 가능)</span></label>
+          <textarea id="f-problem-ocr" style="min-height:90px;" placeholder="AI가 인식한 텍스트가 여기에 표시됩니다..."></textarea>
+        </div>
+      </div>
+
+      <!-- ── AI 구조화 버튼 (텍스트 탭) ── -->
+      <button class="btn-ai" id="ai-btn" onclick="aiStructure()">✦ AI로 자동 구조화하기</button>
+      <div class="ai-result" id="ai-result"></div>
+
+      <!-- ── STEP 2: 메타 정보 ── -->
+      <div class="form-row">
+        <div>
+          <label>출처</label>
+          <input type="text" id="f-source" placeholder="예) 2024 수능 / 30번 / 4점">
+        </div>
+        <div>
+          <label>과목</label>
+          <select id="f-subject">
+            <optgroup label="중등">
+              <option value="중1-1">1학년 1학기</option>
+              <option value="중1-2">1학년 2학기</option>
+              <option value="중2-1">2학년 1학기</option>
+              <option value="중2-2">2학년 2학기</option>
+              <option value="중3-1">3학년 1학기</option>
+              <option value="중3-2">3학년 2학기</option>
+            </optgroup>
+            <optgroup label="고등 (22개정)">
+              <option value="공수1">공통수학1</option>
+              <option value="공수2">공통수학2</option>
+              <option value="대수">대수</option>
+              <option value="미적1">미적분Ⅰ</option>
+              <option value="미적2">미적분Ⅱ</option>
+              <option value="기하">기하</option>
+            </optgroup>
+          </select>
+        </div>
+      </div>
+      <label>교과 단원 / 개념</label>
+      <input type="text" id="f-concept" placeholder="예) 삼각함수 > 그래프와 성질">
+      <label>핵심 아이디어 / 전략</label>
+      <textarea id="f-idea" style="min-height:56px" placeholder="예) f(m)=sin(...)으로 치환 후 주기성 분석"></textarea>
+      <div class="form-row">
+        <div>
+          <label>목표 시간 (분)</label>
+          <input type="text" id="f-time" placeholder="예) 7~9분">
+        </div>
+        <div>
+          <label>난이도</label>
+          <select id="f-diff">
+            <option value="5">★★★★★ 킬러</option>
+            <option value="4" selected>★★★★☆ 준킬러</option>
+            <option value="3">★★★☆☆ 고난도</option>
+            <option value="2">★★☆☆☆ 중급</option>
+            <option value="1">★☆☆☆☆ 기본</option>
+          </select>
+        </div>
+      </div>
+      <label>풀이 단계 (각 줄 = 한 단계, 형식: 단계 제목 | 세부 힌트)</label>
+      <textarea id="f-steps" style="min-height:90px" placeholder="좌변을 인수분해한다 | {P+Q}{P−Q} 형태 활용&#10;우변 분류를 나열한다 | 이차식×이차식 경우 파악&#10;조건 (나)로 경우를 확정한다 | x=1,2 대입 비교"></textarea>
+      <p class="form-hint">각 줄을 ' | '로 구분하면 제목과 힌트가 분리됩니다</p>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" style="color:var(--text-2);border-color:var(--border)" onclick="document.getElementById('add-overlay').classList.remove('open')">취소</button>
+      <button class="btn btn-accent" onclick="saveNew()">저장하기</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ── CONSTANTS ──
+const ADMIN_PW = 'theblack2024';
+
+// ── API KEY 관리 ──
+// 메모리 변수 (가장 신뢰할 수 있는 저장소 — iframe 샌드박스 환경에서 localStorage/sessionStorage 차단됨)
+let _apiKey = '';
+
+function getApiKey(){
+  return _apiKey;
+}
+
+function saveApiKey(){
+  // input에서 직접 읽기 — trim + 특수문자 제거 (복붙 시 앞뒤 공백·개행 방지)
+  const raw = document.getElementById('apikey-input').value;
+  const val = raw.replace(/\s/g,'');  // 모든 공백류 제거
+  if(!val){
+    showToast('API 키를 입력해주세요');
+    return;
+  }
+  // 형식 검사 완화 — sk- 로 시작하면 허용 (sk-ant-, sk-proj- 등 다양한 형식 대응)
+  if(!val.startsWith('sk-')){
+    showToast('API 키는 sk- 로 시작해야 합니다. 키를 다시 확인해주세요.');
+    return;
+  }
+  _apiKey = val;
+
+  // 저장 시도 (환경에 따라 실패할 수 있음 — 메모리 변수가 주된 저장소)
+  try{ sessionStorage.setItem('tmhk_key', val); }catch(e){}
+  try{ localStorage.setItem('tomahawk_apikey', val); }catch(e){}
+
+  // 입력창에 마스킹 표시
+  const masked = val.slice(0,10) + '••••••••••••••••' + val.slice(-4);
+  document.getElementById('apikey-input').value = masked;
+  document.getElementById('apikey-input').dataset.realKey = val;
+
+  updateApiKeyStatus('ok', `● 키 적용됨 (${val.slice(0,12)}...${val.slice(-4)})`);
+  document.getElementById('apikey-test-btn').disabled = false;
+  showToast('✓ API 키가 적용되었습니다. "연결 테스트" 버튼으로 확인해보세요.');
+}
+
+function onApiKeyInput(){
+  const raw = document.getElementById('apikey-input').value.replace(/\s/g,'');
+  // 입력 중엔 dataset 초기화 (새로 타이핑하는 것)
+  document.getElementById('apikey-input').dataset.realKey = '';
+  _apiKey = '';
+  document.getElementById('apikey-test-btn').disabled = true;
+  if(raw.startsWith('sk-') && raw.length > 20){
+    updateApiKeyStatus('format','● 형식 확인됨 — "적용" 버튼을 눌러주세요');
+  } else if(raw.length > 0){
+    updateApiKeyStatus('no','● sk- 로 시작하는 API 키를 입력해주세요');
+  } else {
+    updateApiKeyStatus('no','● 미설정');
+  }
+}
+
+function updateApiKeyStatus(type, msg){
+  const el = document.getElementById('apikey-status');
+  if(!el) return;
+  const colors = {ok:'apikey-ok', format:'apikey-ok', no:'apikey-no', error:'apikey-no', testing:'apikey-ok'};
+  el.innerHTML = `<span class="${colors[type]||'apikey-no'}">${msg||''}</span>`;
+}
+
+async function testApiKey(){
+  const key = getApiKey();
+  if(!key){ showToast('먼저 API 키를 적용해주세요'); return; }
+
+  const btn = document.getElementById('apikey-test-btn');
+  btn.disabled = true; btn.textContent = '테스트 중...';
+  updateApiKeyStatus('testing', '● 연결 확인 중...');
+
+  try{
+    const r = await fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST',
+      headers:{
+        'Content-Type':'application/json',
+        'x-api-key': key,
+        'anthropic-version':'2023-06-01',
+        'anthropic-dangerous-direct-browser-access':'true'
+      },
+      body:JSON.stringify({
+        model:'claude-haiku-4-5-20251001',
+        max_tokens:10,
+        messages:[{role:'user',content:'ping'}]
+      })
+    });
+    const d = await r.json();
+    if(d.error){
+      throw new Error(d.error.message||d.error.type);
+    }
+    updateApiKeyStatus('ok','● 연결 성공 ✓ — AI 기능을 사용할 수 있습니다');
+    showToast('✓ API 연결 성공! 이미지 인식 기능을 사용할 수 있습니다.');
+  }catch(e){
+    updateApiKeyStatus('error',`● 연결 실패: ${e.message}`);
+    showToast('✕ API 키 오류: ' + e.message);
+    _apiKey = '';
+    document.getElementById('apikey-input').value = '';
+    document.getElementById('apikey-input').dataset.realKey = '';
+  }
+  btn.disabled = false; btn.textContent = '연결 테스트';
+}
+
+function loadApiKeyFromStorage(){
+  // 실제 키 복원 시도
+  let saved = '';
+  try{ saved = sessionStorage.getItem('tmhk_key') || ''; }catch(e){}
+  if(!saved){ try{ saved = localStorage.getItem('tomahawk_apikey') || ''; }catch(e){} }
+
+  if(saved && saved.startsWith('sk-') && saved.length > 20){
+    _apiKey = saved;
+    const masked = saved.slice(0,10) + '••••••••••••••••' + saved.slice(-4);
+    const inp = document.getElementById('apikey-input');
+    if(inp){ inp.value = masked; inp.dataset.realKey = saved; }
+    updateApiKeyStatus('ok', `● 키 복원됨 (${saved.slice(0,12)}...${saved.slice(-4)})`);
+    document.getElementById('apikey-test-btn').disabled = false;
+  }
+}
+
+// API 헤더 생성
+function apiHeaders(){
+  // 마스킹된 경우 dataset에서 실제 키 복원 시도
+  if(!_apiKey){
+    const inp = document.getElementById('apikey-input');
+    if(inp && inp.dataset.realKey && inp.dataset.realKey.startsWith('sk-')){
+      _apiKey = inp.dataset.realKey;
+    }
+  }
+  const key = _apiKey;
+  if(!key || key.length < 20){
+    throw new Error('API 키가 설정되지 않았습니다. 상단 배너에서 API 키를 입력하고 "적용" 버튼을 눌러주세요.');
+  }
+  return {
+    'Content-Type':'application/json',
+    'x-api-key': key,
+    'anthropic-version':'2023-06-01',
+    'anthropic-dangerous-direct-browser-access':'true'
+  };
+}
+const ROMAN = ['I','II','III','IV','V','VI','VII','VIII','IX','X'];
+const DIFF_LABEL = {5:'킬러',4:'준킬러',3:'고난도',2:'중급',1:'기본'};
+const DIFF_LABEL_P = {5:'★★★★★ 킬러',4:'★★★★☆ 준킬러',3:'★★★☆☆ 고난도',2:'★★☆☆☆ 중급',1:'★☆☆☆☆ 기본'};
+const DIFF_TAG = {5:'tag-red',4:'tag-amber',3:'tag-teal',2:'tag-blue',1:'tag-gray'};
+const SUBJ_TAG = {
+  '중1-1':'tag-green','중1-2':'tag-green','중2-1':'tag-green','중2-2':'tag-green','중3-1':'tag-green','중3-2':'tag-green',
+  '공수1':'tag-blue','공수2':'tag-blue','대수':'tag-blue','미적1':'tag-teal','미적2':'tag-teal','기하':'tag-teal'
+};
+
+// ── STATE ──
+let problems = [];
+let currentFilter = 'all';
+let currentRole = null; // 'teacher' | 'admin'
+
+// ── ENTRY / LOGIN ──
+function enterAsTeacher() {
+  currentRole = 'teacher';
+  document.getElementById('entry-screen').style.display = 'none';
+  applyRole();
+  document.getElementById('app').classList.add('show');
+}
+
+function showAdminLogin() {
+  document.getElementById('entry-screen').style.display = 'none';
+  document.getElementById('login-screen').classList.add('show');
+  setTimeout(()=>document.getElementById('pw-input').focus(), 100);
+}
+
+function doLogin() {
+  const pw = document.getElementById('pw-input').value;
+  if (pw === ADMIN_PW) {
+    currentRole = 'admin';
+    document.getElementById('login-screen').classList.remove('show');
+    document.getElementById('login-err').textContent = '';
+    document.getElementById('pw-input').value = '';
+    applyRole();
+    document.getElementById('app').classList.add('show');
+  } else {
+    document.getElementById('login-err').textContent = '비밀번호가 올바르지 않습니다.';
+    document.getElementById('pw-input').value = '';
+    document.getElementById('pw-input').focus();
+  }
+}
+
+function backToEntry() {
+  document.getElementById('login-screen').classList.remove('show');
+  document.getElementById('login-err').textContent = '';
+  document.getElementById('pw-input').value = '';
+  document.getElementById('entry-screen').style.display = 'flex';
+}
+
+function logout() {
+  currentRole = null;
+  document.getElementById('app').classList.remove('show');
+  document.getElementById('entry-screen').style.display = 'flex';
+}
+
+function applyRole() {
+  const isAdmin = currentRole === 'admin';
+  const badge = document.getElementById('role-badge');
+  badge.textContent = isAdmin ? 'ADMIN' : 'TEACHER';
+  badge.className = 'role-badge ' + (isAdmin ? 'role-admin' : 'role-teacher');
+  document.querySelectorAll('.admin-only').forEach(el => {
+    el.style.display = isAdmin ? '' : 'none';
+  });
+  loadApiKeyFromStorage();
+  initStorageOnLoad();
+  load();
+}
+
+// ── STORAGE — Google Drive 우선, localStorage 폴백 ──
+
+// --- Drive 상태 ---
+let driveReady      = false;   // OAuth + GAPI 로드 완료
+let driveFileId     = '';      // 저장할 파일의 Drive 파일 ID
+let driveClientId   = '';      // OAuth 클라이언트 ID
+let driveSaving     = false;
+let driveLastSync   = null;
+let _tokenClient    = null;
+let _gapiInited     = false;
+let _gisInited      = false;
+
+const LS_KEY        = 'tmhk_problems_v2';
+const LS_FILEID     = 'tmhk_drive_fileid';
+const LS_CLIENTID   = 'tmhk_drive_clientid';
+const DRIVE_FILENAME= 'tomahawk_problems.json';
+const DRIVE_SCOPE   = 'https://www.googleapis.com/auth/drive.file';
+
+// ---------- 초기화 ----------
+function initStorageOnLoad(){
+  // 저장된 설정 복원
+  try{
+    driveClientId = localStorage.getItem(LS_CLIENTID)||'';
+    driveFileId   = localStorage.getItem(LS_FILEID)||'';
+    const inp = document.getElementById('drive-client-id-input');
+    if(inp && driveClientId) inp.value = driveClientId;
+    const finp = document.getElementById('drive-file-id-input');
+    if(finp && driveFileId) finp.value = driveFileId;
+  }catch(e){}
+
+  // GAPI 라이브러리 로드 대기 후 초기화
+  if(driveClientId){ waitForGapi(); }
+}
+
+function waitForGapi(attempt=0){
+  if(typeof gapi !== 'undefined' && typeof google !== 'undefined'){
+    gapiLoaded(); gisLoaded();
+  } else if(attempt < 30){
+    setTimeout(()=>waitForGapi(attempt+1), 300);
+  } else {
+    setDriveStatus('error','Google API 로드 실패 — 인터넷 연결을 확인해주세요');
+  }
+}
+
+function gapiLoaded(){
+  gapi.load('client', async ()=>{
+    await gapi.client.init({});
+    await gapi.client.load('https://www.googleapis.com/discovery/v1/apis/drive/v3/rest');
+    _gapiInited = true;
+    maybeEnableDrive();
+  });
+}
+
+function gisLoaded(){
+  if(!driveClientId) return;
+  _tokenClient = google.accounts.oauth2.initTokenClient({
+    client_id: driveClientId,
+    scope: DRIVE_SCOPE,
+    callback: async(resp)=>{
+      if(resp.error){ setDriveStatus('error','인증 실패: '+resp.error); return; }
+      _gisInited = true;
+      maybeEnableDrive();
+      await driveSync();
+    },
+  });
+  _gisInited = true;
+  maybeEnableDrive();
+}
+
+function maybeEnableDrive(){
+  if(_gapiInited && _gisInited && driveClientId){
+    driveReady = true;
+    setDriveStatus('connecting','인증 요청 중...');
+    _tokenClient.requestAccessToken({prompt:''});
+  }
+}
+
+// ---------- 저장 / 로드 ----------
+async function load(){
+  // 1순위: Drive (연결된 경우)
+  if(driveReady && driveFileId){
+    try{
+      const data = await driveReadFile();
+      if(data && data.length){ problems = data; updateCounts(); renderList(); updateDriveSyncTime(); return; }
+    }catch(e){ console.warn('Drive load failed, fallback to local:', e.message); }
+  }
+  // 2순위: localStorage
+  try{
+    const raw = localStorage.getItem(LS_KEY);
+    if(raw){ problems = JSON.parse(raw); updateCounts(); renderList(); return; }
+  }catch(e){}
+  // 3순위: 기본값
+  problems = getDefaults();
+  await save();
+  updateCounts(); renderList();
+}
+
+async function save(){
+  const json = JSON.stringify(problems);
+  // localStorage (항상 저장 — 오프라인 백업)
+  try{ localStorage.setItem(LS_KEY, json); }catch(e){}
+  // Drive (연결된 경우)
+  if(driveReady && !driveSaving){
+    driveSaving = true;
+    try{ await driveWriteFile(problems); updateDriveSyncTime(); }
+    catch(e){ setDriveStatus('error','Drive 저장 실패: '+e.message); }
+    driveSaving = false;
+  }
+}
+
+// ---------- Drive API 헬퍼 ----------
+async function driveReadFile(){
+  if(!driveFileId) return null;
+  const r = await gapi.client.drive.files.get({
+    fileId: driveFileId, alt: 'media'
+  });
+  if(r.status !== 200) throw new Error('파일 읽기 실패: '+r.status);
+  return typeof r.result === 'string' ? JSON.parse(r.result) : r.result;
+}
+
+async function driveWriteFile(data){
+  const body = JSON.stringify(data);
+  const boundary = '-------tomahawk_boundary';
+  const delim = '\r\n--'+boundary+'\r\n';
+  const close = '\r\n--'+boundary+'--';
+  const meta = JSON.stringify({name: DRIVE_FILENAME, mimeType:'application/json'});
+
+  if(!driveFileId){
+    // 파일 생성
+    const multipart =
+      delim + 'Content-Type: application/json\r\n\r\n' + meta +
+      delim + 'Content-Type: application/json\r\n\r\n' + body + close;
+    const res = await gapi.client.request({
+      path:'/upload/drive/v3/files', method:'POST',
+      params:{uploadType:'multipart'},
+      headers:{'Content-Type':'multipart/related; boundary="'+boundary.slice(2)+'"'},
+      body: multipart
+    });
+    driveFileId = res.result.id;
+    try{ localStorage.setItem(LS_FILEID, driveFileId); }catch(e){}
+    setDriveStatus('on', '연결됨 — 파일 ID: '+driveFileId.slice(0,12)+'...');
+    document.getElementById('drive-file-id-input').value = driveFileId;
+    showToast('✓ Drive에 새 파일이 생성되었습니다. 파일 ID를 다른 선생님들과 공유하세요.');
+  } else {
+    // 파일 업데이트
+    await gapi.client.request({
+      path:'/upload/drive/v3/files/'+driveFileId, method:'PATCH',
+      params:{uploadType:'media'},
+      headers:{'Content-Type':'application/json'},
+      body: body
+    });
+  }
+}
+
+async function driveSync(){
+  if(!driveReady){ showToast('먼저 구글 드라이브를 연결해주세요'); return; }
+  setDriveStatus('connecting','동기화 중...');
+  try{
+    const data = await driveReadFile();
+    if(data && data.length){
+      // 병합: 최신 ID 기준으로 합치기
+      const map = new Map(problems.map(p=>[p.id, p]));
+      data.forEach(p=>{ if(!map.has(p.id)) map.set(p.id, p); });
+      problems = [...map.values()].sort((a,b)=>b.id-a.id);
+      try{ localStorage.setItem(LS_KEY, JSON.stringify(problems)); }catch(e){}
+      updateCounts(); renderList();
+    }
+    setDriveStatus('on','동기화 완료');
+    updateDriveSyncTime();
+    showToast('✓ 동기화 완료 (총 '+problems.length+'문제)');
+  }catch(e){
+    setDriveStatus('error','동기화 실패: '+e.message);
+  }
+}
+
+function driveDisconnect(){
+  if(!confirm('구글 드라이브 연결을 해제할까요?\n데이터는 로컬에 보존됩니다.')) return;
+  driveReady = false; driveFileId = ''; driveClientId = '';
+  try{ localStorage.removeItem(LS_FILEID); localStorage.removeItem(LS_CLIENTID); }catch(e){}
+  setDriveStatus('off','연결 해제됨');
+  document.getElementById('drive-connect-btn').style.display='';
+  document.getElementById('drive-sync-btn').style.display='none';
+  document.getElementById('drive-disconnect-btn').style.display='none';
+  document.getElementById('drive-sync-time').style.display='none';
+  showToast('구글 드라이브 연결이 해제되었습니다');
+}
+
+function setDriveStatus(state, msg){
+  const dot  = document.getElementById('drive-dot');
+  const info = document.getElementById('drive-info');
+  if(!dot||!info) return;
+  dot.className='drive-status-dot '+state;
+  info.textContent = msg||'';
+  const isOn = state==='on';
+  const cb = document.getElementById('drive-connect-btn');
+  const sb = document.getElementById('drive-sync-btn');
+  const db = document.getElementById('drive-disconnect-btn');
+  if(cb) cb.style.display = isOn ? 'none' : '';
+  if(sb) sb.style.display = isOn ? '' : 'none';
+  if(db) db.style.display = isOn ? '' : 'none';
+}
+
+function updateDriveSyncTime(){
+  driveLastSync = new Date();
+  const el = document.getElementById('drive-sync-time');
+  if(!el) return;
+  el.style.display='';
+  el.textContent = '마지막 동기화: '+driveLastSync.toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit'});
+}
+
+// ---------- 설정 UI ----------
+function openDriveSetup(){
+  document.getElementById('drive-setup-overlay').style.display='flex';
+}
+function closeDriveSetup(e){
+  if(e.target===document.getElementById('drive-setup-overlay'))
+    document.getElementById('drive-setup-overlay').style.display='none';
+}
+function closeDriveSetupPanel(){
+  document.getElementById('drive-setup-overlay').style.display='none';
+}
+function useLocalFallback(){
+  document.getElementById('drive-setup-overlay').style.display='none';
+  showToast('로컬 저장 모드로 사용합니다. 데이터는 이 브라우저에만 저장됩니다.');
+}
+
+async function initGoogleDrive(){
+  const clientId = (document.getElementById('drive-client-id-input').value||'').trim();
+  const fileId   = (document.getElementById('drive-file-id-input').value||'').trim();
+  if(!clientId){ showToast('클라이언트 ID를 입력해주세요'); return; }
+
+  driveClientId = clientId;
+  if(fileId) driveFileId = fileId;
+
+  try{ localStorage.setItem(LS_CLIENTID, clientId); }catch(e){}
+  if(fileId){ try{ localStorage.setItem(LS_FILEID, fileId); }catch(e){} }
+
+  const btn = document.getElementById('drive-connect-go-btn');
+  btn.disabled=true; btn.textContent='연결 중...';
+
+  document.getElementById('drive-setup-overlay').style.display='none';
+  setDriveStatus('connecting','Google 계정 인증 중...');
+
+  waitForGapi();
+  btn.disabled=false; btn.textContent='구글 드라이브 연결하기';
+}
+
+// ── DEFAULT DATA ──
+function getDefaults() {
+  return [{
+    id:1, source:'출처 미상 | 17번 | 4.9점', subject:'공수1',
+    concept:'수학(상) > 다항식 > 합차 공식, 이차다항식 인수분해, 미정계수법',
+    idea:'① {P(x)}²−{Q(x)}²= (P+Q)(P−Q)로 인수분해\n② 우변을 두 이차식의 곱으로 나누는 경우 분류\n③ 조건 (나)로 성립하는 경우 하나로 확정',
+    time:'7~9분', diff:4,
+    problem:'두 이차다항식 P(x), Q(x)가 다음 조건을 만족시킨다.\n(가) 모든 실수 x에 대하여 {P(x)}² − {Q(x)}² = x²(x−1)(x−2)\n(나) |P(2)−Q(2)| < |P(1)−Q(1)|\nP(3)+Q(3) = 24일 때, Q(4)의 값은? [4.9점]',
+    steps:[
+      {title:'좌변을 (P+Q)(P−Q)로 인수분해하고, 우변을 두 이차식의 곱으로 나누는 경우를 모두 나열한다.',hint:'x²(x−1)(x−2)를 두 이차식의 곱으로 쓰는 방법을 체계적으로 분류한다.'},
+      {title:'각 경우에서 P(x)−Q(x)에 x=1, x=2를 대입하여 조건 (나)를 적용한다.',hint:'|P(2)−Q(2)| < |P(1)−Q(1)|이 성립하는 경우만 남긴다.'},
+      {title:'P(x)+Q(x) = A(x)로 놓고 P(3)+Q(3) = A(3) = 24를 이용해 미정계수를 결정한다.',hint:'A(3) = 24를 대입하면 계수가 확정된다.'},
+      {title:'Q(x) = [A(x)−B(x)] / 2를 이용해 Q(x)를 구한다.',hint:'A(x), B(x) 모두 확정된 상태에서 Q(x) 식을 완성한다.'},
+      {title:'Q(4)를 계산한다.',hint:'확정된 Q(x)에 x=4를 대입한다.'}
+    ]
+  }];
+}
+
+// ── COUNTS ──
+function updateCounts() {
+  document.getElementById('cnt-all').textContent = problems.length;
+  [5,4,3,2,1].forEach(d=>{ const el=document.getElementById('cnt-d'+d); if(el) el.textContent=problems.filter(p=>p.diff==d).length; });
+  const sm=[['m11','중1-1'],['m12','중1-2'],['m21','중2-1'],['m22','중2-2'],['m31','중3-1'],['m32','중3-2'],
+             ['h1','공수1'],['h2','공수2'],['ha','대수'],['hc1','미적1'],['hc2','미적2'],['hg','기하']];
+  sm.forEach(([id,subj])=>{ const el=document.getElementById('cnt-'+id); if(el) el.textContent=problems.filter(p=>p.subject===subj).length; });
+}
+
+// ── FILTER ──
+function setFilter(f,el) {
+  currentFilter=f;
+  document.querySelectorAll('.filter-item').forEach(e=>e.classList.remove('active'));
+  el.classList.add('active'); renderList();
+}
+function getFiltered() {
+  const q=document.getElementById('search').value.toLowerCase();
+  let list=[...problems];
+  if(currentFilter!=='all'){
+    if(currentFilter.startsWith('diff-')){ const d=parseInt(currentFilter.split('-')[1]); list=list.filter(p=>p.diff===d); }
+    else if(currentFilter.startsWith('subj-')){ const s=currentFilter.replace('subj-',''); list=list.filter(p=>p.subject===s); }
+  }
+  if(q) list=list.filter(p=>(p.problem||'').toLowerCase().includes(q)||(p.concept||'').toLowerCase().includes(q)||(p.source||'').toLowerCase().includes(q));
+  return list;
+}
+
+// ── RENDER LIST ──
+function renderList() {
+  const list=getFiltered();
+  const el=document.getElementById('problem-list');
+  document.getElementById('count-label').textContent=list.length+'문제';
+  if(!list.length){ el.innerHTML='<div class="empty"><div class="empty-icon">📋</div><div>문제가 없습니다</div></div>'; return; }
+  el.innerHTML=list.map((p,i)=>{
+    const stars='★'.repeat(p.diff)+'☆'.repeat(5-p.diff);
+    const first=(p.problem||'').split('\n')[0].slice(0,76);
+    return `<div class="problem-card" onclick="openDetail(${p.id})">
+      <div class="card-index">${String(i+1).padStart(2,'0')}</div>
+      <div class="card-body">
+        <div class="card-source">${p.source||''}</div>
+        <div class="card-title">${first}${(p.problem||'').split('\n')[0].length>=76?'…':''}</div>
+        <div class="card-meta">
+          <span class="tag ${SUBJ_TAG[p.subject]||'tag-gray'}">${p.subject||''}</span>
+          <span class="tag ${DIFF_TAG[p.diff]||'tag-gray'}">${DIFF_LABEL[p.diff]||''}</span>
+          ${p.concept?'<span class="tag tag-gray">'+p.concept.split('>')[0].trim()+'</span>':''}
+        </div>
+      </div>
+      <div class="card-right">
+        <span class="time-badge">⏱ ${p.time||'—'}</span>
+        <span style="font-size:11px;color:var(--accent);">${stars}</span>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ── DETAIL ──
+function openDetail(id) {
+  const p=problems.find(x=>x.id===id); if(!p) return;
+  const isAdmin=currentRole==='admin';
+  const stars='★'.repeat(p.diff)+'☆'.repeat(5-p.diff);
+  const stepsHtml=(p.steps||[]).map((s,i)=>`
+    <div class="step-row">
+      <div class="step-num-circle">${ROMAN[i]||i+1}</div>
+      <div class="step-body">
+        <div class="step-main">${s.title}</div>
+        <div class="step-sub">${s.hint||''}</div>
+        <div class="step-space-box"></div>
+      </div>
+    </div>`).join('');
+  const problemHtml=(p.problem||'').split('\n').map((l,i)=>
+    `<div style="font-size:${i===0?'13px':'12px'};${i===0?'font-weight:600;margin-bottom:8px;':''}">${l}</div>`
+  ).join('');
+  const adminActions=isAdmin?`<button class="btn btn-danger" onclick="deleteProblem(${p.id})">삭제</button>`:'';
+  document.getElementById('detail-content').innerHTML=`
+    <div class="modal-header">
+      <div><div class="modal-brand">TOMAHAWK</div><div class="modal-source">${p.source||''}</div></div>
+      <button class="modal-close" onclick="document.getElementById('detail-overlay').classList.remove('open')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="meta-grid">
+        <div class="meta-box"><div class="meta-box-label">📖 개념 출처</div><div class="meta-box-val" style="white-space:pre-line;">${p.concept||'—'}</div></div>
+        <div class="meta-box"><div class="meta-box-label">💡 핵심 아이디어</div><div class="meta-box-val" style="white-space:pre-line;">${p.idea||'—'}</div></div>
+        <div class="meta-box"><div class="meta-box-label">⏱ 목표 시간</div><div class="meta-box-val" style="font-size:15px;font-weight:600;">${p.time||'—'}</div></div>
+        <div class="meta-box"><div class="meta-box-label">🎯 난이도</div><div class="meta-box-val"><span style="color:var(--accent);font-size:13px;">${stars}</span> <span class="tag ${DIFF_TAG[p.diff]||'tag-gray'}" style="margin-left:4px;">${DIFF_LABEL[p.diff]||''}</span></div></div>
+      </div>
+      <hr class="section-sep">
+      <div class="section-label">문제</div>
+      <div class="problem-text-box">${problemHtml}</div>
+      <hr class="section-sep">
+      <div class="section-label">풀이 단계</div>
+      <div class="steps-list">${stepsHtml}</div>
+      <div style="margin-top:18px;padding-top:13px;border-top:1px solid var(--border-light);display:flex;justify-content:space-between;align-items:center;">
+        <div>${adminActions}</div>
+        <div style="display:flex;gap:8px;">
+          <button class="btn btn-pdf" onclick="printProblem(${p.id})">🖨 PDF 출력</button>
+          <button class="btn btn-primary" onclick="document.getElementById('detail-overlay').classList.remove('open')">닫기</button>
+        </div>
+      </div>
+    </div>`;
+  document.getElementById('detail-overlay').classList.add('open');
+}
+function closeDetail(e){ if(e.target===document.getElementById('detail-overlay')) document.getElementById('detail-overlay').classList.remove('open'); }
+
+// ── ADD ──
+let currentImageB64 = null;
+let currentImageType = 'image/jpeg';
+
+// ── ADD MODAL OPEN / CLOSE / TAB ──
+let currentTab = 'text';
+
+function openAdd(){
+  ['f-problem','f-source','f-concept','f-idea','f-time','f-steps','f-problem-ocr'].forEach(id=>{
+    const el=document.getElementById(id); if(el) el.value='';
+  });
+  const ar=document.getElementById('ai-result'); if(ar){ar.classList.remove('show');ar.innerHTML='';}
+  clearImage();
+  switchTab('text');
+  document.getElementById('add-overlay').classList.add('open');
+}
+function closeAdd(e){
+  if(e.target===document.getElementById('add-overlay'))
+    document.getElementById('add-overlay').classList.remove('open');
+}
+function switchTab(tab){
+  currentTab=tab;
+  document.getElementById('tab-text').classList.toggle('active', tab==='text');
+  document.getElementById('tab-image').classList.toggle('active', tab==='image');
+  document.getElementById('panel-text').style.display = tab==='text' ? '' : 'none';
+  document.getElementById('panel-image').style.display = tab==='image' ? '' : 'none';
+  const aib=document.getElementById('ai-btn'); if(aib) aib.style.display = tab==='text' ? '' : 'none';
+  const air=document.getElementById('ai-result'); if(air) air.classList.remove('show');
+}
+
+// ── Canvas 전처리: 리사이즈 + 보정 + 품질평가 ──
+function preprocessImage(file, callback){
+  const reader = new FileReader();
+  reader.onerror = function(){ callback(null,'bad',0,0,'파일을 읽을 수 없습니다'); };
+  reader.onload = function(ev){
+    const img = new Image();
+    img.onerror = function(){ callback(null,'bad',0,0,'이미지를 불러올 수 없습니다'); };
+    img.onload = function(){
+      try {
+        // ① 최적 해상도: 짧은 변 기준 1200px (API 최적)
+        const TARGET = 1200;
+        let w=img.width, h=img.height;
+        const shorter = Math.min(w,h);
+        if(shorter > TARGET){
+          const scale = TARGET/shorter;
+          w = Math.round(w*scale); h = Math.round(h*scale);
+        }
+        // 너무 작으면 업스케일 (200px 이하)
+        if(Math.min(w,h) < 200){
+          const scale = 200/Math.min(w,h);
+          w = Math.round(w*scale); h = Math.round(h*scale);
+        }
+
+        const canvas = document.createElement('canvas');
+        canvas.width=w; canvas.height=h;
+        const ctx = canvas.getContext('2d');
+
+        // ② 흰 배경 (투명PNG·CMYK 대응)
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0,0,w,h);
+        ctx.drawImage(img,0,0,w,h);
+
+        // ③ 픽셀 분석 (품질 평가용 샘플)
+        const id = ctx.getImageData(0,0,w,h);
+        const d  = id.data;
+        let sum=0, sum2=0, cnt=0;
+        const step = Math.max(4, Math.floor(d.length/4/500))*4;
+        for(let i=0; i<d.length; i+=step){
+          const gray = d[i]*0.299 + d[i+1]*0.587 + d[i+2]*0.114;
+          sum+=gray; sum2+=gray*gray; cnt++;
+        }
+        const mean    = sum/cnt;
+        const variance= sum2/cnt - mean*mean;
+
+        // ④ 자동 보정 (어두운 이미지만 대비 강화, 적정 이미지는 유지)
+        const needsBoost = mean < 180 || variance < 600;
+        if(needsBoost){
+          const factor = mean < 100 ? 1.6 : 1.35; // 매우 어두우면 더 강하게
+          const offset = mean < 100 ? 40  : 20;
+          for(let i=0; i<d.length; i+=4){
+            const gray = d[i]*0.299 + d[i+1]*0.587 + d[i+2]*0.114;
+            const v = Math.min(255, Math.max(0, (gray-128)*factor + 128 + offset));
+            d[i]=d[i+1]=d[i+2]=v;
+          }
+          ctx.putImageData(id,0,0);
+        }
+
+        // ⑤ 품질 등급
+        const quality = variance>1400 ? 'good' : variance>500 ? 'warn' : 'bad';
+
+        // ⑥ 미리보기 canvas (보정된 이미지)
+        const dc = document.getElementById('img-canvas');
+        if(dc){
+          dc.width=w; dc.height=h;
+          dc.getContext('2d').putImageData(id,0,0);
+        }
+
+        // ⑦ base64 출력 (크기에 따라 품질 조정)
+        const pixels = w*h;
+        const jpgQ   = pixels > 1000000 ? 0.82 : 0.90;
+        const b64    = canvas.toDataURL('image/jpeg', jpgQ).split(',')[1];
+
+        // ⑧ 10MB 초과 체크
+        const byteSize = Math.round(b64.length * 0.75);
+        if(byteSize > 10*1024*1024){
+          // 더 작게 재압축
+          const b64small = canvas.toDataURL('image/jpeg', 0.65).split(',')[1];
+          callback(b64small, quality, w, h, null);
+        } else {
+          callback(b64, quality, w, h, null);
+        }
+      } catch(err){
+        callback(null,'bad',0,0,'전처리 중 오류: '+err.message);
+      }
+    };
+    img.src = ev.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+function handleFileSelect(e){ const f=e.target.files[0]; if(!f) return; loadImageFile(f); e.target.value=''; }
+function handleDrop(e){
+  e.preventDefault();
+  document.getElementById('img-drop-zone').classList.remove('dragover');
+  const f=e.dataTransfer.files[0];
+  if(f&&f.type.startsWith('image/')) loadImageFile(f);
+}
+function loadImageFile(file){
+  currentImageType='image/jpeg';
+  showQuality('warn','⟳ 이미지 분석 중...');
+  preprocessImage(file,function(b64,quality,w,h,errMsg){
+    if(!b64 || errMsg){
+      showQuality('bad','✕ ' + (errMsg||'이미지 처리 실패 — 다른 이미지를 시도해주세요'));
+      return;
+    }
+    currentImageB64=b64;
+    const canvas=document.getElementById('img-canvas');
+    if(canvas) canvas.style.display='block';
+    document.getElementById('img-placeholder').style.display='none';
+    document.getElementById('img-clear-btn').style.display='';
+    document.getElementById('ocr-btn').style.display='';
+    document.getElementById('ocr-result').classList.remove('show');
+    document.getElementById('ocr-text-wrap').style.display='none';
+    document.getElementById('retry-row').style.display='none';
+    document.getElementById('ocr-stages').classList.remove('show');
+    if(quality==='good') showQuality('good',`✓ 인식하기 좋은 이미지 (${w}×${h}px) — 바로 인식을 시작하세요`);
+    else if(quality==='warn') showQuality('warn',`⚠ 이미지가 다소 어둡습니다 (${w}×${h}px) — 가능하면 밝은 곳에서 재촬영`);
+    else showQuality('bad',`✕ 이미지가 너무 어둡습니다 — 밝은 조명 아래서 다시 촬영해주세요`);
+  });
+}
+function showQuality(type,msg){
+  const bar=document.getElementById('img-quality-bar');
+  bar.className='img-quality-bar '+(type==='loading'?'warn':type);
+  document.getElementById('img-quality-icon').textContent=type==='good'?'✓':type==='warn'?'⚠':'✕';
+  document.getElementById('img-quality-text').textContent=msg;
+}
+function clearImage(){
+  currentImageB64=null;
+  const canvas=document.getElementById('img-canvas'); if(canvas) canvas.style.display='none';
+  const ph=document.getElementById('img-placeholder'); if(ph) ph.style.display='';
+  const cb=document.getElementById('img-clear-btn'); if(cb) cb.style.display='none';
+  const ob=document.getElementById('ocr-btn'); if(ob) ob.style.display='none';
+  const ow=document.getElementById('ocr-text-wrap'); if(ow) ow.style.display='none';
+  const rr=document.getElementById('retry-row'); if(rr) rr.style.display='none';
+  const os=document.getElementById('ocr-stages'); if(os) os.classList.remove('show');
+  const qb=document.getElementById('img-quality-bar'); if(qb) qb.className='img-quality-bar';
+  const res=document.getElementById('ocr-result'); if(res){res.classList.remove('show');res.innerHTML='';}
+}
+function setStage(id,state){
+  const el=document.getElementById(id); if(!el) return;
+  el.className='ocr-stage '+state;
+  const L={
+    'stage-preprocess':{'':'이미지 전처리',active:'⟳ 이미지 전처리 중...',done:'✓ 이미지 전처리 완료',error:'✕ 전처리 실패'},
+    'stage-ocr':{'':'텍스트 인식 대기',active:'⟳ 문제 텍스트 인식 중...',done:'✓ 텍스트 인식 완료',error:'✕ 텍스트 인식 실패 — 다시 촬영해보세요'},
+    'stage-struct':{'':'구조화 대기',active:'⟳ 풀이 단계 구조화 중...',done:'✓ 구조화 완료',error:'✕ 구조화 실패 — 텍스트 수정 후 재시도'},
+  };
+  el.innerHTML=`<span class="stage-dot"></span>${(L[id]&&L[id][state])||id}`;
+}
+
+// ── 2단계 OCR 파이프라인 ──
+async function ocrAndStructure(){
+  if(!currentImageB64){showToast('이미지를 먼저 업로드해주세요');return;}
+  if(!getApiKey()){showToast('상단 배너에서 API 키를 먼저 입력해주세요');document.getElementById('apikey-input').focus();return;}
+  const btn=document.getElementById('ocr-btn');
+  const res=document.getElementById('ocr-result');
+  const stages=document.getElementById('ocr-stages');
+  btn.disabled=true; btn.textContent='인식 중...';
+  res.classList.remove('show'); res.innerHTML='';
+  document.getElementById('retry-row').style.display='none';
+  stages.classList.add('show');
+  setStage('stage-preprocess','done'); // 이미 완료된 전처리
+  setStage('stage-ocr','active');
+  setStage('stage-struct','');
+
+  // ── STAGE 1: 이미지 → 텍스트 OCR ──
+  let problemText='';
+  try{
+    const r1 = await fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST',
+      headers:apiHeaders(),
+      body:JSON.stringify({
+        model:'claude-sonnet-4-20250514',
+        max_tokens:1500,
+        messages:[{
+          role:'user',
+          content:[
+            {type:'image', source:{type:'base64', media_type:'image/jpeg', data:currentImageB64}},
+            {type:'text', text:`당신은 수학 문제 이미지를 텍스트로 변환하는 전문가입니다.
+이 이미지에 있는 수학 문제의 텍스트를 정확하게 추출해주세요.
+
+추출 규칙:
+1. 문제 번호, 조건 (가)(나)(다), 보기 ㄱㄴㄷ, 선지 ①②③④⑤, 물음 모두 포함
+2. 수식 표기: 분수→a/b, 제곱→x^2, 루트→√n, 절댓값→|x|, 시그마→Σ, 극한→lim
+3. 집합 기호: ∈ ∉ ⊂ ∩ ∪ 그대로 사용
+4. 줄바꿈은 실제 문제 구조에 맞게 유지
+5. 이미지에 없는 내용은 추가하지 말 것
+6. 오직 문제 텍스트만 출력 (설명, JSON, 마크다운 없이)`}
+          ]
+        }]
+      })
+    });
+
+    if(!r1.ok){
+      let errBody = '';
+      try{ errBody = await r1.text(); }catch(ee){}
+      const parsed = errBody ? JSON.parse(errBody) : {};
+      const msg = parsed?.error?.message || errBody.slice(0,100) || `HTTP ${r1.status}`;
+      throw new Error(`HTTP ${r1.status}: ${msg}`);
+    }
+
+    const d1 = await r1.json();
+    if(d1.error) throw new Error(d1.error.message||`API 오류 (type: ${d1.error.type})`);
+    if(!d1.content||!d1.content.length) throw new Error('API 응답이 비어있습니다');
+
+    problemText = d1.content.filter(c=>c.type==='text').map(c=>c.text).join('').trim();
+    if(!problemText || problemText.length < 5) throw new Error('텍스트를 인식하지 못했습니다 — 이미지 품질을 확인해주세요');
+
+    document.getElementById('f-problem-ocr').value = problemText;
+    document.getElementById('ocr-text-wrap').style.display = '';
+    setStage('stage-ocr','done');
+
+  }catch(e){
+    setStage('stage-ocr','error');
+    setStage('stage-struct','error');
+    res.classList.add('show');
+    const isNetwork = e.message.includes('fetch') || e.message.includes('network') || e.message.includes('Failed');
+    res.innerHTML=`
+      <div style="color:var(--red);font-weight:500;margin-bottom:6px;">✕ 텍스트 인식 실패</div>
+      <div style="font-size:11px;color:var(--text-2);margin-bottom:8px;">오류: ${e.message}</div>
+      <div style="font-size:11px;color:var(--text-3);">
+        ${isNetwork
+          ? '💡 네트워크 오류입니다. 인터넷 연결을 확인하고 재시도해주세요.'
+          : '💡 이미지를 다시 촬영하거나 텍스트 탭에서 직접 입력할 수 있습니다.'}
+      </div>`;
+    document.getElementById('retry-row').style.display='flex';
+    btn.disabled=false; btn.textContent='✦ 문제 인식 시작';
+    return;
+  }
+
+  // ── STAGE 2: 텍스트 → 구조화 JSON ──
+  setStage('stage-struct','active');
+  try{
+    const r2 = await fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST',
+      headers:apiHeaders(),
+      body:JSON.stringify({
+        model:'claude-sonnet-4-20250514',
+        max_tokens:1500,
+        messages:[{
+          role:'user',
+          content:`다음 수학 문제를 분석해서 아래 JSON 형식으로만 응답하세요.
+코드블록(\`\`\`)이나 설명 없이 JSON만 출력하세요.
+
+문제:
+${problemText}
+
+출력 형식:
+{
+  "concept": "교과명 > 단원 > 핵심 개념",
+  "idea": "① 풀이 핵심 아이디어\n② 두번째 아이디어 (있을 경우)",
+  "time": "목표 풀이 시간 (예: 7~9분)",
+  "diff": 4,
+  "steps": [
+    {"title": "I단계 제목 (구체적으로)", "hint": "학생에게 줄 힌트"},
+    {"title": "II단계 제목", "hint": "힌트"}
+  ]
+}
+
+diff 기준: 1=기본, 2=중급, 3=고난도, 4=준킬러, 5=킬러`
+        }]
+      })
+    });
+
+    if(!r2.ok){
+      let errBody2 = '';
+      try{ errBody2 = await r2.text(); }catch(ee){}
+      const parsed2 = errBody2 ? JSON.parse(errBody2) : {};
+      const msg2 = parsed2?.error?.message || errBody2.slice(0,100) || `HTTP ${r2.status}`;
+      throw new Error(`HTTP ${r2.status}: ${msg2}`);
+    }
+
+    const d2 = await r2.json();
+    if(d2.error) throw new Error(d2.error.message||'구조화 API 오류');
+
+    const rawTxt = d2.content.filter(c=>c.type==='text').map(c=>c.text).join('').trim();
+    // JSON 추출 — 코드블록, 앞뒤 텍스트 제거
+    const jsonMatch = rawTxt.match(/\{[\s\S]*\}/);
+    if(!jsonMatch) throw new Error('JSON 형식 응답을 파싱할 수 없습니다');
+    const parsed = JSON.parse(jsonMatch[0]);
+
+    if(parsed.concept) document.getElementById('f-concept').value = parsed.concept;
+    if(parsed.idea)    document.getElementById('f-idea').value    = parsed.idea;
+    if(parsed.time)    document.getElementById('f-time').value    = parsed.time;
+    if(parsed.diff)    document.getElementById('f-diff').value    = String(parsed.diff);
+    if(parsed.steps && parsed.steps.length)
+      document.getElementById('f-steps').value =
+        parsed.steps.map(s=>s.title+(s.hint?' | '+s.hint:'')).join('\n');
+
+    setStage('stage-struct','done');
+    res.classList.add('show');
+    res.innerHTML='<span style="color:var(--teal);font-weight:500;">✓ 인식 및 구조화 완료!</span> <span style="font-size:11px;color:var(--text-3);">인식된 텍스트를 확인하고 필요 시 수정 후 저장하세요.</span>';
+
+  }catch(e){
+    setStage('stage-struct','error');
+    res.classList.add('show');
+    res.innerHTML=`
+      <div style="color:var(--text-2);font-weight:500;margin-bottom:4px;">⚠ 구조화 단계에서 오류</div>
+      <div style="font-size:11px;color:var(--text-3);">오류: ${e.message}</div>
+      <div style="font-size:11px;color:var(--text-3);margin-top:4px;">💡 텍스트 인식은 완료되었습니다. 아래 텍스트를 확인 후 "텍스트만 재구조화" 버튼을 눌러주세요.</div>`;
+    document.getElementById('retry-row').style.display='flex';
+  }
+  btn.disabled=false; btn.textContent='✦ 문제 인식 시작';
+}
+// 구조화만 재시도
+async function structureFromOcrText(){
+  const problemText=(document.getElementById('f-problem-ocr').value||'').trim();
+  if(!problemText){showToast('인식된 텍스트가 없습니다. 먼저 이미지 인식을 실행해주세요.');return;}
+  const res=document.getElementById('ocr-result');
+  setStage('stage-struct','active');
+  res.classList.add('show');
+  res.innerHTML='<span style="color:var(--accent);">⟳ 구조화 재시도 중...</span>';
+  document.getElementById('retry-row').style.display='none';
+  try{
+    const r=await fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST',
+      headers:apiHeaders(),
+      body:JSON.stringify({
+        model:'claude-sonnet-4-20250514',
+        max_tokens:1500,
+        messages:[{role:'user',
+          content:`다음 수학 문제를 분석해서 아래 JSON 형식으로만 응답하세요.
+코드블록이나 설명 없이 JSON만 출력하세요.
+
+문제:
+${problemText}
+
+출력 형식:
+{
+  "concept": "교과명 > 단원 > 핵심 개념",
+  "idea": "① 핵심 아이디어\n② 두번째 아이디어",
+  "time": "목표 시간 (예: 7~9분)",
+  "diff": 4,
+  "steps": [
+    {"title": "단계 제목", "hint": "힌트"},
+    {"title": "단계 제목", "hint": "힌트"}
+  ]
+}`
+        }]
+      })
+    });
+    if(!r.ok) throw new Error(`HTTP ${r.status}`);
+    const d=await r.json();
+    if(d.error) throw new Error(d.error.message||'API 오류');
+    const rawTxt=d.content.filter(c=>c.type==='text').map(c=>c.text).join('').trim();
+    const jsonMatch=rawTxt.match(/\{[\s\S]*\}/);
+    if(!jsonMatch) throw new Error('JSON 파싱 실패');
+    const parsed=JSON.parse(jsonMatch[0]);
+    if(parsed.concept) document.getElementById('f-concept').value=parsed.concept;
+    if(parsed.idea)    document.getElementById('f-idea').value=parsed.idea;
+    if(parsed.time)    document.getElementById('f-time').value=parsed.time;
+    if(parsed.diff)    document.getElementById('f-diff').value=String(parsed.diff);
+    if(parsed.steps&&parsed.steps.length)
+      document.getElementById('f-steps').value=parsed.steps.map(s=>s.title+(s.hint?' | '+s.hint:'')).join('\n');
+    setStage('stage-struct','done');
+    res.innerHTML='<span style="color:var(--teal);font-weight:500;">✓ 구조화 완료!</span>';
+  }catch(e){
+    setStage('stage-struct','error');
+    res.innerHTML=`<div style="color:var(--red);">✕ 구조화 실패: ${e.message}</div><div style="font-size:11px;color:var(--text-3);margin-top:4px;">💡 텍스트를 직접 수정하고 다시 시도해주세요.</div>`;
+    document.getElementById('retry-row').style.display='flex';
+  }
+}
+// ── AI STRUCTURE (텍스트 탭) ──
+async function aiStructure(){
+  const problem=document.getElementById('f-problem').value.trim();
+  if(!problem){ showToast('문제를 먼저 입력해주세요'); return; }
+  if(!getApiKey()){showToast('상단 배너에서 API 키를 먼저 입력해주세요');document.getElementById('apikey-input').focus();return;}
+  const btn=document.getElementById('ai-btn'), res=document.getElementById('ai-result');
+  btn.disabled=true; btn.textContent='분석 중...';
+  res.classList.add('show'); res.innerHTML='<span style="color:var(--accent);">✦ AI가 문제를 분석하고 있습니다...</span>';
+  try {
+    const resp=await fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST',headers:apiHeaders(),
+      body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:1000,messages:[{role:'user',
+        content:`다음 수학 문제를 분석해서 아래 JSON 형식으로만 응답하세요. 다른 텍스트 없이 JSON만 출력하세요.\n\n문제:\n${problem}\n\n응답 형식:\n{\n  "concept": "교과 단원 > 소단원 > 핵심개념",\n  "idea": "풀이 핵심 아이디어 1~3줄 (번호 매겨서)",\n  "time": "목표 시간 (예: 7~9분)",\n  "diff": 1~5 숫자 (1=기본, 5=킬러),\n  "steps": [{"title": "단계 제목", "hint": "세부 힌트"}, ...]\n}`
+      }]})
+    });
+    const data=await resp.json();
+    const text=data.content.map(c=>c.text||'').join('');
+    const parsed=JSON.parse(text.replace(/```json|```/g,'').trim());
+    document.getElementById('f-concept').value=parsed.concept||'';
+    document.getElementById('f-idea').value=parsed.idea||'';
+    document.getElementById('f-time').value=parsed.time||'';
+    document.getElementById('f-diff').value=parsed.diff||4;
+    if(parsed.steps&&parsed.steps.length) document.getElementById('f-steps').value=parsed.steps.map(s=>s.title+(s.hint?' | '+s.hint:'')).join('\n');
+    res.innerHTML='<span style="color:var(--teal);">✓ 자동 구조화 완료! 확인 후 저장하세요.</span>';
+  } catch(e){ res.innerHTML='<span style="color:var(--red);">⚠ 오류가 발생했습니다. 수동으로 입력해주세요.</span>'; }
+  btn.disabled=false; btn.textContent='✦ AI로 자동 구조화하기';
+}
+
+// ── SAVE ──
+function saveNew(){
+  // 현재 탭에 따라 문제 텍스트 결정
+  let problem = '';
+  if(currentTab === 'image'){
+    problem = (document.getElementById('f-problem-ocr').value||'').trim();
+    if(!problem){ showToast('이미지 인식 후 텍스트를 확인해주세요'); return; }
+  } else {
+    problem = (document.getElementById('f-problem').value||'').trim();
+    if(!problem){ showToast('문제를 입력해주세요'); return; }
+  }
+  const stepsRaw=document.getElementById('f-steps').value.trim();
+  const steps=stepsRaw?stepsRaw.split('\n').filter(Boolean).map(line=>{ const p=line.split(' | '); return{title:p[0]||'',hint:p[1]||''}; }):[];
+  problems.unshift({id:Date.now(),source:document.getElementById('f-source').value.trim(),
+    subject:document.getElementById('f-subject').value,concept:document.getElementById('f-concept').value.trim(),
+    idea:document.getElementById('f-idea').value.trim(),time:document.getElementById('f-time').value.trim(),
+    diff:parseInt(document.getElementById('f-diff').value),problem,steps});
+  save(); updateCounts(); renderList();
+  document.getElementById('add-overlay').classList.remove('open');
+  showToast('✓ 문제가 저장되었습니다');
+}
+
+// ── DELETE ──
+function deleteProblem(id){
+  if(currentRole!=='admin'){ showToast('관리자만 삭제할 수 있습니다.'); return; }
+  if(!confirm('이 문제를 삭제할까요?')) return;
+  problems=problems.filter(p=>p.id!==id);
+  save(); updateCounts(); renderList();
+  document.getElementById('detail-overlay').classList.remove('open');
+  showToast('삭제되었습니다');
+}
+
+// ── EXPORT ──
+function exportAll(){
+  if(currentRole!=='admin') return;
+  const blob=new Blob([JSON.stringify(problems,null,2)],{type:'application/json'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='tomahawk_problems.json'; a.click();
+  showToast('JSON으로 내보냈습니다');
+}
+
+// ── PDF PRINT ──
+function buildPrintHTML(list){
+  const LOGO_SRC='data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACgAAAAoCAYAAACM/rhtAAADd0lEQVR42u2YTWwUZRjHf+87M9vO7uxSqN1UallbS0N3K0q0bYyHevGCBiFeDCREwVii8WbgYDx4MH603j148WLChaOJBaVVUxVNDBW6UJBCSwulH9APdrfuzvt4WLaJCSR2V7c12ec2mWTe3/zn/zzPP6NERNjApdngVQGsAFYA/++AdqkPuN8YVUptDEAReQCM4PsGy7JKBlSlbpJcLreqogIEcBxnfRU0vo+2LE71f827x47iRcIY36AUKIRgyOPFvS/zRk9PyZ/dLsV34+PXuJgcoTYaxc9mEWAlB/URxfvHBhn74zIf9fZhjCkasKQuDgQCuMEg1VXVOFUuEc9lf1eYHQ0e8e2NfPnF5/z6yxm01hjjlx9QRDDGgBhWcoadWxW9eyx6nlFMLwpifH4cGsrbwsj6zUEBbA1TC8LwDTgxLIgYMjlFNFpHKX34rwA6FtxOCbsesTh9cYXPBhcQFI6lWVpcQim1Ph4E8AVmloXu1io6GoUTo5t4rjPOSmaFkOfR9/GHXLt6Fcuy8nYoJ6ACaoKa3XGbnbXLHD1+k3fe+4Cv+k8SCofRWnN7fp6B09/c82GZAJVSSDZFSO7QVKuZTSlSrQd5+NE2NoeDOIEqvJCH7/sorUmn0+X1oIignCAZp46hSymWq2P0fdrLocOvcWdh4W9NYVkWHZ1d+cO0Lg+gZduICHte2st3P3xPdEsE3/fJ+f7qfk6nU0xNTvHqodd56ukOjDFFAdrFqFdQKOR5PP7kLpoea0FrTTgcwXVdjDG0Jdo53HOEI2+9je/7xfu8lLDw4DSzDnmwADMxPsH09E1c16Ut3sa5388zc+sWLa2tTF6fYH5ujlhsG/Gtht/OXUdCDaRSS9i2Q2dXF7Zt/zeAxuTz3Zmff0JrzYVkkuaW7QwODPLtqZO8sv8Ao6OjXBqbZHf3EySSxxnoT1Hd+SY6u0S1GySRSLCppmZNyv9j1xYMnmhvxwlUsbkmAndvINm7pNMZonVbeOH5Z4k/9CeBpcvQ/QluYh+ZxTlyvmH47FlmZmfL58ErV8ZoaqwnOXKe0QtJOnZEaaivIZWBWerZFosxMpLEthReOEImnaapuXnNnl0z4Gp6vs9Bcm+75C8MqNJXfdEKFnxkjEFE0FqjEArhv3BP5d8GRFBFzEFV+btVAawAVgArgBXAkuovDx1632tvpzgAAAAASUVORK5CYII=';
+  const pages=list.map(p=>{
+    const problemHtml=(p.problem||'').split('\n').map((l,i)=>`<p class="${i===0?'q-title':'q-line'}">${l}</p>`).join('');
+    const steps=(p.steps||[]).map((s,i)=>`
+      <div class="p-step">
+        <div class="p-step-num">${ROMAN[i]||i+1}</div>
+        <div class="p-step-body">
+          <div class="p-step-title">${s.title}</div>
+          ${s.hint?`<div class="p-step-hint">${s.hint}</div>`:''}
+          <div class="p-work-box"></div>
+        </div>
+      </div>`).join('');
+    return `<div class="p-page">
+      <div class="p-header">
+        <img src="${LOGO_SRC}" style="height:28px;width:auto;object-fit:contain;" alt="더블랙에듀">
+        <span class="p-brand">TOMAHAWK</span>
+        <span class="p-source">${p.source||''}</span>
+        <span class="p-date">${new Date().toLocaleDateString('ko-KR')}</span>
+      </div>
+      <div class="p-meta-row">
+        <div class="p-meta-box"><div class="p-meta-label">📖 개념 출처</div><div class="p-meta-val">${(p.concept||'—').replace(/\n/g,'<br>')}</div></div>
+        <div class="p-meta-box"><div class="p-meta-label">💡 핵심 아이디어</div><div class="p-meta-val">${(p.idea||'—').replace(/\n/g,'<br>')}</div></div>
+        <div class="p-meta-box p-meta-sm"><div class="p-meta-label">⏱ 목표 시간</div><div class="p-meta-val p-time">${p.time||'—'}</div></div>
+        <div class="p-meta-box p-meta-sm"><div class="p-meta-label">🎯 난이도</div><div class="p-meta-val">${DIFF_LABEL_P[p.diff]||'—'}</div></div>
+      </div>
+      <div class="p-section-label">문제</div>
+      <div class="p-problem-box">${problemHtml}</div>
+      <div class="p-section-label">풀이 단계</div>
+      <div class="p-steps">${steps}</div>
+      <div class="p-footer"><span>이름 :</span><span style="margin-left:80px;">날짜 :</span><span style="flex:1;"></span><span>TOMAHAWK · 더블랙에듀</span></div>
+    </div>`;
+  }).join('<div class="page-break"></div>');
+
+  return `<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"><title>TOMAHAWK PDF</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@300;400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'IBM Plex Sans KR',sans-serif;background:#fff;color:#1A1814;font-size:12px;line-height:1.6;}
+.p-page{width:210mm;min-height:297mm;padding:14mm 17mm 13mm;background:#fff;position:relative;}
+.page-break{page-break-after:always;}
+.p-header{display:flex;align-items:center;gap:10px;border-bottom:2px solid #1A1814;padding-bottom:8px;margin-bottom:12px;}
+.p-brand{font-family:'IBM Plex Mono',monospace;font-size:14px;font-weight:600;letter-spacing:3px;color:#C8960A;}
+.p-source{font-size:10px;color:#5A5750;font-family:'IBM Plex Mono',monospace;}
+.p-date{margin-left:auto;font-size:10px;color:#9A978F;}
+.p-meta-row{display:grid;grid-template-columns:1fr 1fr 0.55fr 0.55fr;gap:7px;margin-bottom:12px;}
+.p-meta-box{border:0.5px solid #DDD9D0;border-radius:4px;padding:7px 9px;background:#F9F8F5;}
+.p-meta-label{font-size:8px;font-weight:600;letter-spacing:.8px;text-transform:uppercase;color:#9A978F;margin-bottom:3px;}
+.p-meta-val{font-size:11px;color:#1A1814;line-height:1.5;}
+.p-time{font-size:13px;font-weight:600;}
+.p-section-label{font-size:8px;font-weight:600;letter-spacing:1.2px;text-transform:uppercase;color:#9A978F;margin-bottom:7px;border-left:2.5px solid #C8960A;padding-left:6px;}
+.p-problem-box{border:0.5px solid #DDD9D0;border-radius:4px;padding:10px 13px;margin-bottom:12px;background:#FDFCFA;}
+.q-title{font-size:12px;font-weight:600;margin-bottom:7px;}
+.q-line{font-size:11px;margin-bottom:2px;}
+.p-steps{display:flex;flex-direction:column;}
+.p-step{display:flex;gap:10px;padding:10px 0;border-bottom:0.5px solid #EAE7E0;}
+.p-step:last-child{border-bottom:none;}
+.p-step-num{width:24px;height:24px;border:1.5px solid #1A1814;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:9px;font-family:'IBM Plex Mono',monospace;font-weight:500;flex-shrink:0;margin-top:1px;}
+.p-step-body{flex:1;}
+.p-step-title{font-size:11px;font-weight:600;margin-bottom:2px;}
+.p-step-hint{font-size:10px;color:#5A5750;margin-bottom:3px;}
+.p-work-box{height:56px;border:0.5px dashed #C8C5BC;border-radius:3px;margin-top:4px;background:#FDFCFA;}
+.p-footer{position:absolute;bottom:9mm;left:17mm;right:17mm;display:flex;align-items:center;font-size:9px;color:#9A978F;border-top:0.5px solid #EAE7E0;padding-top:5px;}
+@media print{body{background:#fff!important;}.p-page{width:100%;padding:12mm 15mm;min-height:unset;page-break-after:always;}.p-page:last-child{page-break-after:avoid;}.page-break{display:none;}.no-print{display:none!important;}@page{size:A4;margin:0;}}
+@media screen{body{background:#E8E5DF;}.p-page{margin:24px auto;box-shadow:0 2px 20px rgba(0,0,0,.12);}.print-toolbar{position:fixed;top:0;left:0;right:0;height:50px;background:#1A1814;display:flex;align-items:center;justify-content:space-between;padding:0 24px;z-index:10;}.pt-brand{font-family:'IBM Plex Mono',monospace;font-size:13px;color:#C8960A;letter-spacing:2px;}.pt-info{font-size:11px;color:#9A978F;}.pt-btns{display:flex;gap:8px;}.pt-btn{font-family:'IBM Plex Sans KR',sans-serif;font-size:12px;padding:6px 14px;border-radius:4px;cursor:pointer;border:1px solid transparent;font-weight:500;}.pt-close{background:transparent;border-color:#4A4740;color:#CCC9C0;}.pt-close:hover{background:#3A3530;}.pt-print{background:#1A5FA8;color:#fff;border-color:#1A5FA8;}.pt-print:hover{background:#0E4A8A;}.p-wrap{padding-top:66px;padding-bottom:36px;}}
+</style></head><body>
+<div class="print-toolbar no-print">
+  <span class="pt-brand">TOMAHAWK</span>
+  <span class="pt-info">총 ${list.length}문제 · PDF 저장: 인쇄 > "PDF로 저장" 선택</span>
+  <div class="pt-btns">
+    <button class="pt-btn pt-close" onclick="window.close()">✕ 닫기</button>
+    <button class="pt-btn pt-print" onclick="window.print()">🖨 인쇄 / PDF 저장</button>
+  </div>
+</div>
+<div class="p-wrap">${pages}</div>
+</body></html>`;
+}
+
+function printProblem(id){ const p=problems.find(x=>x.id===id); if(!p) return; const w=window.open('','_blank','width=900,height=1000'); w.document.write(buildPrintHTML([p])); w.document.close(); }
+function printFiltered(){ const list=getFiltered(); if(!list.length){ showToast('출력할 문제가 없습니다'); return; } if(list.length>20&&!confirm(`현재 ${list.length}개 문제를 모두 출력할까요?`)) return; const w=window.open('','_blank','width=900,height=1000'); w.document.write(buildPrintHTML(list)); w.document.close(); }
+
+// ── TOAST ──
+function showToast(msg){ const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2400); }
+</script>
+</body>
+</html>
